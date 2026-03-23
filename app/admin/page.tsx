@@ -663,7 +663,8 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
     };
 
     const printSchoolQR = () => {
-        const qrData = 'SCHOOL_ATTENDANCE';
+        // Automatically grab the Vercel URL you are currently on!
+        const qrData = `${window.location.origin}/scan?qr=SCHOOL_ATTENDANCE`;
 
         QRCode.toDataURL(qrData, {
             width: 300,
