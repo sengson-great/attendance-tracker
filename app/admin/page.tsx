@@ -23,7 +23,6 @@ const translations = {
     onTime: 'ទាន់ពេល',
     late: 'យឺត',
     veryLate: 'យឺតខ្លាំង',
-    avgLate: 'មធ្យមយឺត',
     absent: 'អវត្តមាន',
 
     // Buttons
@@ -183,7 +182,6 @@ interface Stats {
     late: number;
     veryLate: number;
     onTime: number;
-    avgLateMinutes: number;
 }
 
 interface TelegramConfig {
@@ -264,8 +262,7 @@ export default function AdminPage() {
         absent: 0,
         late: 0,
         veryLate: 0,
-        onTime: 0,
-        avgLateMinutes: 0
+        onTime: 0
     });
     const [showAddForm, setShowAddForm] = useState(false);
     const [showLateConfig, setShowLateConfig] = useState(false);
@@ -320,6 +317,16 @@ export default function AdminPage() {
             }
         };
         loadSettings();
+
+        // Load telegram config from local storage to prevent it from resetting on refresh
+        const savedTelegramConfig = localStorage.getItem('telegramConfig');
+        if (savedTelegramConfig) {
+            try {
+                setTelegramConfig(JSON.parse(savedTelegramConfig));
+            } catch (e) {
+                console.error("Error parsing telegram config from storage", e);
+            }
+        }
     }, []);
 
     useEffect(() => {
@@ -410,10 +417,6 @@ export default function AdminPage() {
                 .filter(a => a.late_minutes && a.late_minutes > 0)
                 .map(a => a.late_minutes || 0);
 
-            const avgLateMinutes = lateMinutes.length > 0
-                ? Math.round(lateMinutes.reduce((a, b) => a + b, 0) / lateMinutes.length)
-                : 0;
-
             setStats({
                 total: employeesData?.length || 0,
                 present,
@@ -421,7 +424,6 @@ export default function AdminPage() {
                 late,
                 veryLate,
                 onTime,
-                avgLateMinutes
             });
         } catch (error) {
             console.error('Error loading data:', error);
@@ -530,7 +532,6 @@ ${minutes > 0 ? `⏱️ *យឺត:* ${formatMinutes(minutes)}` : ''}
 🔴 *យឺតខ្លាំង:* ${stats.veryLate}
 👥 *វត្តមាន:* ${stats.present}/${stats.total}
 ❌ *អវត្តមាន:* ${stats.absent}
-⏱️ *មធ្យមយឺត:* ${formatMinutes(stats.avgLateMinutes)}
 
 *ព័ត៌មានលម្អិត:*
 ${attendanceList || 'មិនទាន់មានការចុះវត្តមាននៅឡើយទេ'}
@@ -1019,12 +1020,6 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
                         color="red"
                     />
                     <StatCard
-                        title={translations.avgLate}
-                        value={formatMinutes(stats.avgLateMinutes)}
-                        icon={<Clock className="h-5 w-5" />}
-                        color="orange"
-                    />
-                    <StatCard
                         title={translations.absent}
                         value={stats.absent}
                         icon={<UserX className="h-5 w-5" />}
@@ -1041,9 +1036,6 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
                                 <span className="font-medium text-gray-700">
                                     ⚠️ {stats.late + stats.veryLate} {translations.employeesLateToday}
                                 </span>
-                            </div>
-                            <div className="text-sm text-gray-500">
-                                {translations.averageLate} {formatMinutes(stats.avgLateMinutes)}
                             </div>
                             <button
                                 onClick={sendDailySummary}
@@ -1107,7 +1099,6 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
                                         <th className="text-left py-3 px-4 font-semibold text-gray-600">{translations.checkInTime}</th>
                                         <th className="text-left py-3 px-4 font-semibold text-gray-600">{translations.status}</th>
                                         <th className="text-left py-3 px-4 font-semibold text-gray-600">{translations.lateMinutes}</th>
-                                        <th className="text-left py-3 px-4 font-semibold text-gray-600">{translations.location}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1140,7 +1131,7 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
                                                         <span className="text-gray-400">-</span>
                                                     )}
                                                 </td>
-                                                <td className="py-3 px-4">
+                                                {/* <td className="py-3 px-4">
                                                     {a.location_verified ? (
                                                         <div className="flex items-center space-x-1">
                                                             <MapPin className="h-4 w-4 text-green-500" />
@@ -1151,7 +1142,7 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
                                                     ) : (
                                                         <span className="text-xs text-red-500">{translations.notVerified}</span>
                                                     )}
-                                                </td>
+                                                </td> */}
                                             </tr>
                                         );
                                     })}
@@ -1397,9 +1388,22 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
 
                             <div className="flex space-x-3 pt-6">
                                 <button
-                                    onClick={() => {
-                                        setShowLateConfig(false);
-                                        loadData();
+                                    onClick={async () => {
+                                        try {
+                                            // Actively update to database so next time we refresh or scan, it's correct instantly
+                                            await supabase
+                                                .from('school_settings')
+                                                .update({
+                                                    school_start_hour: lateConfig.schoolStartHour,
+                                                    school_start_minute: lateConfig.schoolStartMinute,
+                                                    grace_period: lateConfig.gracePeriod
+                                                })
+                                                .eq('id', 1);
+                                            setShowLateConfig(false);
+                                            loadData();
+                                        } catch (error) {
+                                            console.error("Failed to save late config", error);
+                                        }
                                     }}
                                     className="flex-1 bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 transition-colors font-medium"
                                 >

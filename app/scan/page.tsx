@@ -789,13 +789,13 @@ const sendTelegramNotification = async (attendanceRecord: any, status: string, m
 
                     {/* Search */}
                     <div className="relative mb-4">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-900" />
                       <input
                         type="text"
                         placeholder={translations.searchPlaceholder}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                        className="w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-black"
                         autoFocus
                       />
                     </div>
@@ -859,7 +859,7 @@ const sendTelegramNotification = async (attendanceRecord: any, status: string, m
                     </h2>
 
                     <div className="text-5xl mb-2">{selectedEmployee.emoji}</div>
-                    <p className="text-2xl font-semibold mb-1">{selectedEmployee.full_name}</p>
+                    <p className="text-2xl font-semibold mb-1 text-black">{selectedEmployee.full_name}</p>
                     <p className="text-gray-500 mb-4">{selectedEmployee.department}</p>
 
                     <div className="bg-blue-50 rounded-xl p-4 mt-4">

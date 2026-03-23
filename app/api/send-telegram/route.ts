@@ -39,6 +39,15 @@ export async function POST(request: Request) {
   }
 }
 
+const formatLateTime = (totalMinutes: number): string => {
+  if (!totalMinutes) return "0 នាទី";
+  if (totalMinutes < 60) return `${totalMinutes} នាទី`;
+  const hours = Math.floor(totalMinutes / 60);
+  const mins = totalMinutes % 60;
+  if (mins === 0) return `${hours} ម៉ោង`;
+  return `${hours} ម៉ោង ${mins} នាទី`;
+};
+
 async function sendCheckinNotification(data: any) {
   // Support both field names (employeeName or teacherName)
   const employeeName = data.employeeName || data.teacherName || data.name;
@@ -115,14 +124,14 @@ async function sendCheckinNotification(data: any) {
 🆔 <b>លេខសម្គាល់:</b> ${employeeId}
 ⏰ <b>ម៉ោង:</b> ${timeFormatted}
 📊 <b>ស្ថានភាព:</b> ${emoji} ${khmer}
-${lateMinutes > 0 ? `⏱️ <b>យឺត:</b> ${lateMinutes} នាទី` : ""}
+${lateMinutes > 0 ? `⏱️ <b>យឺត:</b> ${formatLateTime(lateMinutes)}` : ""}
 ${distance ? `📍 <b>ចម្ងាយ:</b> ${distance} ម៉ែត្រ` : ""}
 📅 <b>កាលបរិច្ឆេទ:</b> ${dateFormatted}
   `.trim();
 
   // If it's a late arrival, add a warning
   if (status === "late" || status === "very-late") {
-    message += `\n\n⚠️ <b>សូមចំណាំ:</b> បុគ្គលិកបានមកយឺត ${lateMinutes} នាទី`;
+    message += `\n\n⚠️ <b>សូមចំណាំ:</b> បុគ្គលិកបានមកយឺត ${formatLateTime(lateMinutes)}`;
   }
 
   return await sendTelegramMessage(message);
