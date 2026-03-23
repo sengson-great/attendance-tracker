@@ -156,6 +156,13 @@ export default function ScanPage() {
     loadEmployees();
     loadSchoolLocation();
 
+    // Check if user came directly from scanning a URL-based QR code
+    const urlParams = new URLSearchParams(window.location.search);
+    const qrParam = urlParams.get('qr');
+    if (qrParam === 'SCHOOL_ATTENDANCE' || qrParam?.includes('school-attendance')) {
+      setStep('employees');
+    }
+
     return () => {
       stopCamera();
     };
