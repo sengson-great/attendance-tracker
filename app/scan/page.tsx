@@ -604,7 +604,7 @@ const sendTelegramNotification = async (attendanceRecord: any, status: string, m
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent pb-1">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent leading-relaxed py-3">
             {translations.appTitle}
           </h1>
           <p className="text-gray-600 mt-2">{translations.appSubtitle}</p>
@@ -646,7 +646,7 @@ const sendTelegramNotification = async (attendanceRecord: any, status: string, m
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="text-center py-8"
+                    className="text-center py-8 text-black"
                   >
                     <div className="bg-blue-100 rounded-full w-32 h-32 flex items-center justify-center mx-auto mb-6">
                       <Camera className="w-16 h-16 text-blue-600" />
@@ -934,7 +934,7 @@ const sendTelegramNotification = async (attendanceRecord: any, status: string, m
               animate={{ opacity: 1 }}
               className="mt-6 bg-white rounded-xl p-4 shadow"
             >
-              <h3 className="font-semibold mb-3 flex items-center">
+              <h3 className="font-semibold mb-3 flex items-center text-black">
                 <Users className="h-4 w-4 mr-2 text-blue-600" />
                 {translations.todayCheckins}
               </h3>
@@ -1024,7 +1024,7 @@ function LiveAttendancePreview() {
           transition={{ delay: i * 0.1 }}
           className="flex items-center justify-between text-sm p-2 hover:bg-gray-50 rounded-lg"
         >
-          <span className="font-medium">{item.employee_name}</span>
+          <span className="font-medium text-black">{item.employee_name}</span>
           <span className="text-gray-400">
             {new Date(item.check_in).toLocaleTimeString('km-KH', {
               hour: '2-digit',

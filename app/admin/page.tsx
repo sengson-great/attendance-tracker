@@ -1115,7 +1115,7 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
                                         const employee = employees.find(t => t.id === a.employee_id);
                                         return (
                                             <tr key={i} className="border-b hover:bg-gray-50 transition-colors">
-                                                <td className="py-3 px-4 font-medium">{a.employee_name}</td>
+                                                <td className="py-3 px-4 font-medium text-black">{a.employee_name}</td>
                                                 <td className="py-3 px-4 text-gray-600">{a.employee_id}</td>
                                                 <td className="py-3 px-4 text-gray-600">
                                                     {new Date(a.check_in).toLocaleTimeString('km-KH', {
