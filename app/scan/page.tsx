@@ -62,6 +62,7 @@ const translations = {
   veryLate: 'យឺតខ្លាំង',
   lateBy: 'យឺត',
   minutes: 'នាទី',
+  hours: 'ម៉ោង',
   initializingCamera: 'កំពុងរៀបចំកាមេរ៉ា...',
   cameraReady: 'កាមេរ៉ារួចរាល់',
   cameraError: 'កំហុសកាមេរ៉ា',
@@ -87,6 +88,15 @@ const supabase = createClient(
     }
   }
 );
+
+const formatMinutes = (totalMinutes: number): string => {
+  if (!totalMinutes) return `0 ${translations.minutes}`;
+  if (totalMinutes < 60) return `${totalMinutes} ${translations.minutes}`;
+  const hours = Math.floor(totalMinutes / 60);
+  const mins = totalMinutes % 60;
+  if (mins === 0) return `${hours} ${translations.hours}`;
+  return `${hours} ${translations.hours} ${mins} ${translations.minutes}`;
+};
 
 export default function ScanPage() {
   const [step, setStep] = useState<'welcome' | 'scan' | 'employees' | 'success' | 'error'>('welcome');
@@ -314,29 +324,35 @@ export default function ScanPage() {
     }
   };
 
-  const sendTelegramNotification = async (attendanceRecord: any, status: string, minutes: number) => {
+const sendTelegramNotification = async (attendanceRecord: any, status: string, minutes: number) => {
     try {
-      console.log('📤 Sending Telegram notification for:', attendanceRecord.employee_name);
+        console.log('📤 Sending Telegram notification for:', attendanceRecord.employee_name);
 
-      const response = await fetch('/api/send-telegram', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          employeeName: attendanceRecord.employee_name,
-          employeeId: attendanceRecord.employee_id,
-          checkInTime: attendanceRecord.check_in,
-          status,
-          lateMinutes: minutes,
-          distance: attendanceRecord.distance_from_school
-        })
-      });
+        const response = await fetch('/api/send-telegram', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                employeeName: attendanceRecord.employee_name,
+                employeeId: attendanceRecord.employee_id,
+                checkInTime: attendanceRecord.check_in,
+                status: status,
+                lateMinutes: minutes,
+                distance: attendanceRecord.distance_from_school
+            })
+        });
 
-      const data = await response.json();
-      console.log('📥 Telegram response:', data);
+        const data = await response.json();
+        console.log('📥 Telegram response:', data);
+        
+        if (!response.ok) {
+            console.error('❌ Telegram error:', data.error);
+        } else {
+            console.log('✅ Telegram notification sent successfully');
+        }
     } catch (error) {
-      console.error('❌ Failed to send Telegram notification:', error);
+        console.error('❌ Failed to send Telegram notification:', error);
     }
-  };
+};
 
   const stopCamera = useCallback(() => {
     if (scanIntervalRef.current) {
@@ -575,9 +591,9 @@ export default function ScanPage() {
       case 'on-time':
         return translations.onTime;
       case 'late':
-        return minutes ? `${translations.late} (${minutes} ${translations.minutes})` : translations.late;
+        return minutes ? `${translations.late} (${formatMinutes(minutes)})` : translations.late;
       case 'very-late':
-        return minutes ? `${translations.veryLate} (${minutes} ${translations.minutes})` : translations.veryLate;
+        return minutes ? `${translations.veryLate} (${formatMinutes(minutes)})` : translations.veryLate;
       default:
         return '';
     }
@@ -588,7 +604,7 @@ export default function ScanPage() {
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent pb-1">
             {translations.appTitle}
           </h1>
           <p className="text-gray-600 mt-2">{translations.appSubtitle}</p>
@@ -842,7 +858,7 @@ export default function ScanPage() {
                     <div className="bg-blue-50 rounded-xl p-4 mt-4">
                       <div className="flex items-center justify-center space-x-2 text-blue-600 mb-2">
                         <Clock className="h-4 w-4" />
-                        <span className="font-medium">{new Date().toLocaleTimeString()}</span>
+                        <span className="font-medium">{new Date().toLocaleTimeString('km-KH')}</span>
                       </div>
                       <div className="flex items-center justify-center space-x-2 text-blue-600">
                         <MapPin className="h-4 w-4" />
@@ -1010,7 +1026,7 @@ function LiveAttendancePreview() {
         >
           <span className="font-medium">{item.employee_name}</span>
           <span className="text-gray-400">
-            {new Date(item.check_in).toLocaleTimeString([], {
+            {new Date(item.check_in).toLocaleTimeString('km-KH', {
               hour: '2-digit',
               minute: '2-digit'
             })}

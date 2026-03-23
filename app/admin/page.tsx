@@ -45,6 +45,7 @@ const translations = {
     employeesLateToday: 'បុគ្គលិកយឺតថ្ងៃនេះ',
     averageLate: 'មធ្យមយឺត',
     minutes: 'នាទី',
+    hours: 'ម៉ោង',
 
     // Date selector
     selectDate: 'ជ្រើសរើសកាលបរិច្ឆេទ',
@@ -225,6 +226,33 @@ const colorClasses: Record<ColorType, string> = {
     purple: 'bg-purple-50 text-purple-600',
     orange: 'bg-orange-50 text-orange-600',
     teal: 'bg-teal-50 text-teal-600'
+};
+
+const formatMinutes = (totalMinutes: number): string => {
+    if (!totalMinutes) return `0 ${translations.minutes}`;
+    if (totalMinutes < 60) return `${totalMinutes} ${translations.minutes}`;
+    const hours = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    if (mins === 0) return `${hours} ${translations.hours}`;
+    return `${hours} ${translations.hours} ${mins} ${translations.minutes}`;
+};
+
+const toKhmerNum = (num: number | string) => {
+    const khmerNums = ['០', '១', '២', '៣', '៤', '៥', '៦', '៧', '៨', '៩'];
+    return num.toString().split('').map(n => khmerNums[parseInt(n)] || n).join('');
+};
+
+const formatKhmerDateLong = (dateString: string | Date) => {
+    const days = ['អាទិត្យ', 'ចន្ទ', 'អង្គារ', 'ពុធ', 'ព្រហស្បតិ៍', 'សុក្រ', 'សៅរ៍'];
+    const months = ['មករា', 'កុម្ភៈ', 'មីនា', 'មេសា', 'ឧសភា', 'មិថុនា', 'កក្កដា', 'សីហា', 'កញ្ញា', 'តុលា', 'វិច្ឆិកា', 'ធ្នូ'];
+    
+    const d = new Date(dateString);
+    const dayName = days[d.getDay()];
+    const date = toKhmerNum(d.getDate());
+    const month = months[d.getMonth()];
+    const year = toKhmerNum(d.getFullYear());
+
+    return `ថ្ងៃ${dayName} ទី${date} ខែ${month} ឆ្នាំ${year}`;
 };
 
 export default function AdminPage() {
@@ -443,10 +471,10 @@ export default function AdminPage() {
 
 👤 *បុគ្គលិក:* ${attendanceRecord.employee_name}
 🆔 *លេខសម្គាល់:* ${attendanceRecord.employee_id}
-⏰ *ម៉ោង:* ${new Date(attendanceRecord.check_in).toLocaleTimeString()}
+⏰ *ម៉ោង:* ${new Date(attendanceRecord.check_in).toLocaleTimeString('km-KH')}
 📊 *ស្ថានភាព:* ${statusEmoji} ${statusLabel}
-${minutes > 0 ? `⏱️ *យឺត:* ${minutes} នាទី` : ''}
-📅 *កាលបរិច្ឆេទ:* ${new Date().toLocaleDateString()}
+${minutes > 0 ? `⏱️ *យឺត:* ${formatMinutes(minutes)}` : ''}
+📅 *កាលបរិច្ឆេទ:* ${formatKhmerDateLong(new Date())}
     `;
 
         console.log('Sending Telegram message:', message);
@@ -488,21 +516,21 @@ ${minutes > 0 ? `⏱️ *យឺត:* ${minutes} នាទី` : ''}
         setTelegramStatus('sending');
 
         const attendanceList = attendance.map(a => {
-            const time = new Date(a.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const time = new Date(a.check_in).toLocaleTimeString('km-KH', { hour: '2-digit', minute: '2-digit' });
             const icon = a.status === 'on-time' ? '✅' : a.status === 'late' ? '⚠️' : '🔴';
-            return `${icon} ${a.employee_name} - ${time}${a.late_minutes ? ` (${a.late_minutes} ${translations.minutes})` : ''}`;
+            return `${icon} ${a.employee_name} - ${time}${a.late_minutes ? ` (${formatMinutes(a.late_minutes)})` : ''}`;
         }).join('\n');
 
         const message = `
 *📊 របាយការណ៍វត្តមានប្រចាំថ្ងៃ*
-📅 *កាលបរិច្ឆេទ:* ${new Date(selectedDate).toLocaleDateString()}
+📅 *កាលបរិច្ឆេទ:* ${formatKhmerDateLong(selectedDate)}
 
 ✅ *ទាន់ពេល:* ${stats.onTime}
 ⚠️ *យឺត:* ${stats.late}
 🔴 *យឺតខ្លាំង:* ${stats.veryLate}
 👥 *វត្តមាន:* ${stats.present}/${stats.total}
 ❌ *អវត្តមាន:* ${stats.absent}
-⏱️ *មធ្យមយឺត:* ${stats.avgLateMinutes} ${translations.minutes}
+⏱️ *មធ្យមយឺត:* ${formatMinutes(stats.avgLateMinutes)}
 
 *ព័ត៌មានលម្អិត:*
 ${attendanceList || 'មិនទាន់មានការចុះវត្តមាននៅឡើយទេ'}
@@ -544,7 +572,7 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
 
         const message = `
 *✅ សាកល្បងការតភ្ជាប់តេឡេក្រាម*
-🕐 *ម៉ោង:* ${new Date().toLocaleTimeString()}
+🕐 *ម៉ោង:* ${new Date().toLocaleTimeString('km-KH')}
 📊 *ប្រព័ន្ធ:* ចុះវត្តមានក្រុមហ៊ុន ឬស្ថាប័ន
 ✨ *ស្ថានភាព:* ដំណើរការល្អ!
     `;
@@ -815,7 +843,7 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
                 a.date,
                 a.employee_name,
                 a.employee_id,
-                new Date(a.check_in).toLocaleTimeString(),
+                new Date(a.check_in).toLocaleTimeString('km-KH'),
                 a.status === 'on-time' ? 'ទាន់ពេល' : a.status === 'late' ? 'យឺត' : 'យឺតខ្លាំង',
                 a.late_minutes || 0
             ]);
@@ -991,7 +1019,7 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
                     />
                     <StatCard
                         title={translations.avgLate}
-                        value={stats.avgLateMinutes}
+                        value={formatMinutes(stats.avgLateMinutes)}
                         icon={<Clock className="h-5 w-5" />}
                         color="orange"
                     />
@@ -1014,7 +1042,7 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
                                 </span>
                             </div>
                             <div className="text-sm text-gray-500">
-                                {translations.averageLate} {stats.avgLateMinutes} {translations.minutes}
+                                {translations.averageLate} {formatMinutes(stats.avgLateMinutes)}
                             </div>
                             <button
                                 onClick={sendDailySummary}
@@ -1059,12 +1087,7 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
                 {/* Today's Attendance */}
                 <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
                     <h2 className="text-xl font-semibold mb-4 text-black">
-                        {translations.attendanceFor} {new Date(selectedDate).toLocaleDateString('km-KH', {
-                            weekday: 'long',
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric'
-                        })}
+                        {translations.attendanceFor} {formatKhmerDateLong(selectedDate)}
                     </h2>
 
                     {attendance.length === 0 ? (
@@ -1110,7 +1133,7 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
                                                 <td className="py-3 px-4">
                                                     {a.late_minutes ? (
                                                         <span className="font-medium text-gray-700">
-                                                            {a.late_minutes} {translations.minutes}
+                                                            {formatMinutes(a.late_minutes)}
                                                         </span>
                                                     ) : (
                                                         <span className="text-gray-400">-</span>
@@ -1187,7 +1210,7 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
                                                             <p className={`text-xs flex items-center ${today.status === 'very-late' ? 'text-red-600' : 'text-yellow-600'
                                                                 }`}>
                                                                 <Clock className="h-3 w-3 mr-1" />
-                                                                {today.late_minutes} {translations.minLate}
+                                                                {formatMinutes(today.late_minutes)}
                                                             </p>
                                                         ) : (
                                                             <p className="text-xs text-green-600 flex items-center">
@@ -1550,10 +1573,9 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
     );
 }
 
-// StatCard component with proper typing
 interface StatCardProps {
     title: string;
-    value: number;
+    value: number | string;
     icon: React.ReactNode;
     color: ColorType;
 }

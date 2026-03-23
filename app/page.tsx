@@ -62,12 +62,12 @@ export default function Home() {
           className="text-center max-w-3xl mx-auto"
         >
           <h1 className="text-6xl font-bold mb-6">
-            <span className="text-blue-600 bg-clip-text">
+            <span className="text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text pb-2 inline-block">
               {translations.title}
             </span>
             <br />
             <br />
-            <span className="text-gray-400 bg-clip-text">
+            <span className="text-transparent bg-gradient-to-r from-gray-400 to-gray-600 bg-clip-text pb-2 inline-block">
               {translations.subtitle}
             </span>
           </h1>
