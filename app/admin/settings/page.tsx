@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { updateSchoolSettingsAction } from '../../actions';
 
 // Khmer translations
 const translations = {
@@ -299,27 +300,22 @@ export default function SettingsPage() {
     setMessage(null);
 
     try {
-      const { error } = await supabase
-        .from('school_settings')
-        .upsert({
-          id: 1,
-          school_name: settings.school_name,
-          latitude: settings.latitude,
-          longitude: settings.longitude,
-          allowed_radius: settings.allowed_radius,
-          school_start_hour: settings.school_start_hour,
-          school_start_minute: settings.school_start_minute,
-          grace_period: settings.grace_period,
-          telegram_enabled: settings.telegram_enabled,
-          telegram_bot_token: settings.telegram_bot_token,
-          telegram_chat_id: settings.telegram_chat_id,
-          telegram_notify_on_time: settings.telegram_notify_on_time,
-          telegram_notify_late: settings.telegram_notify_late,
-          telegram_notify_very_late: settings.telegram_notify_very_late,
-          updated_at: new Date().toISOString()
-        });
-
-      if (error) throw error;
+      await updateSchoolSettingsAction({
+        school_name: settings.school_name,
+        latitude: settings.latitude,
+        longitude: settings.longitude,
+        allowed_radius: settings.allowed_radius,
+        school_start_hour: settings.school_start_hour,
+        school_start_minute: settings.school_start_minute,
+        grace_period: settings.grace_period,
+        telegram_enabled: settings.telegram_enabled,
+        telegram_bot_token: settings.telegram_bot_token,
+        telegram_chat_id: settings.telegram_chat_id,
+        telegram_notify_on_time: settings.telegram_notify_on_time,
+        telegram_notify_late: settings.telegram_notify_late,
+        telegram_notify_very_late: settings.telegram_notify_very_late,
+        updated_at: new Date().toISOString()
+      });
 
       setMessage({ type: 'success', text: translations.saveSuccess });
     } catch (error) {
@@ -342,12 +338,7 @@ export default function SettingsPage() {
 
     setPinChanging(true);
     try {
-      const { error } = await supabase
-        .from('school_settings')
-        .update({ admin_pin: newPin })
-        .eq('id', 1);
-
-      if (error) throw error;
+      await updateSchoolSettingsAction({ admin_pin: newPin });
 
       setSettings({ ...settings, admin_pin: newPin });
       setMessage({ type: 'success', text: translations.pinChanged });

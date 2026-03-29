@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { addEmployeeAction, deleteEmployeeAction, updateSchoolSettingsAction } from '../actions';
 import { motion } from 'framer-motion';
 import {
     Users, UserCheck, UserX, Clock, Calendar,
@@ -622,17 +623,13 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
         }
 
         try {
-            const { error } = await supabase
-                .from('employees')
-                .insert([{
-                    employee_id: newEmployee.employee_id || `TCH${Math.floor(100 + Math.random() * 900)}`,
-                    full_name: newEmployee.full_name,
-                    department: newEmployee.department || 'មិនមានកំណត់',
-                    emoji: newEmployee.emoji,
-                    active: true
-                }]);
-
-            if (error) throw error;
+            await addEmployeeAction({
+                employee_id: newEmployee.employee_id || `TCH${Math.floor(100 + Math.random() * 900)}`,
+                full_name: newEmployee.full_name,
+                department: newEmployee.department || 'មិនមានកំណត់',
+                emoji: newEmployee.emoji,
+                active: true
+            });
 
             setShowAddForm(false);
             setNewEmployee({
@@ -651,10 +648,7 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
     const deleteEmployee = async (id: string) => {
         if (confirm(translations.deleteConfirm)) {
             try {
-                await supabase
-                    .from('employees')
-                    .update({ active: false })
-                    .eq('id', id);
+                await deleteEmployeeAction(id);
                 loadData();
                 alert(translations.deleteSuccess);
             } catch (error) {
@@ -971,9 +965,14 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
                                 {translations.addEmployee}
                             </button>
                             <button
-                                onClick={() => {
-                                    localStorage.removeItem('admin_session');
-                                    window.location.href = '/';
+                                onClick={async () => {
+                                    try {
+                                        await fetch('/api/auth', { method: 'DELETE' });
+                                    } catch (e) {
+                                        console.error(e);
+                                    } finally {
+                                        window.location.href = '/';
+                                    }
                                 }}
                                 className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                                 title="ចាកចេញ"
@@ -1391,14 +1390,11 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
                                     onClick={async () => {
                                         try {
                                             // Actively update to database so next time we refresh or scan, it's correct instantly
-                                            await supabase
-                                                .from('school_settings')
-                                                .update({
-                                                    school_start_hour: lateConfig.schoolStartHour,
-                                                    school_start_minute: lateConfig.schoolStartMinute,
-                                                    grace_period: lateConfig.gracePeriod
-                                                })
-                                                .eq('id', 1);
+                                            await updateSchoolSettingsAction({
+                                                school_start_hour: lateConfig.schoolStartHour,
+                                                school_start_minute: lateConfig.schoolStartMinute,
+                                                grace_period: lateConfig.gracePeriod
+                                            });
                                             setShowLateConfig(false);
                                             loadData();
                                         } catch (error) {

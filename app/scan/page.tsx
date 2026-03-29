@@ -8,6 +8,7 @@ import {
   Users, ArrowLeft, Clock, MapPin, Loader,
   AlertCircle, RefreshCw, CameraOff, Navigation
 } from 'lucide-react';
+import { recordAttendanceAction } from '../actions';
 
 // Types
 interface Employee {
@@ -505,53 +506,23 @@ const sendTelegramNotification = async (attendanceRecord: any, status: string, m
         return;
       }
 
-      const today = new Date().toISOString().split('T')[0];
+      const result = await recordAttendanceAction({
+        employee_id: employee.id,
+        location: translations.schoolEntrance,
+        location_lat: userLocation?.lat,
+        location_lng: userLocation?.lng,
+        location_verified: true,
+        distance_from_school: distance,
+      });
 
-      // Check if already checked in
-      const { data: existing, error: checkError } = await supabase
-        .from('attendance')
-        .select('*')
-        .eq('employee_id', employee.id)
-        .eq('date', today)
-        .maybeSingle();
-
-      if (checkError) {
-        console.error('Check error:', checkError);
-      }
-
-      if (existing) {
+      if (result.alreadyCheckedIn) {
         setStep('success');
         setLoading(false);
         return;
       }
 
-      // Determine if late
-      const now = new Date();
-      const { status, minutes } = calculateLateStatus(now.toISOString());
-
-      // Record new attendance with location
-      const { data: newAttendance, error: insertError } = await supabase
-        .from('attendance')
-        .insert([{
-          employee_id: employee.id,
-          employee_name: employee.full_name,
-          check_in: now.toISOString(),
-          date: today,
-          location: translations.schoolEntrance,
-          location_lat: userLocation?.lat,
-          location_lng: userLocation?.lng,
-          location_verified: true,
-          distance_from_school: distance,
-          verification_method: ['gps'],
-          status: status
-        }])
-        .select()
-        .single();
-
-      if (insertError) throw insertError;
-
       // Send Telegram notification
-      await sendTelegramNotification(newAttendance, status, minutes);
+      await sendTelegramNotification(result.attendance, result.status, result.minutes);
 
       setStep('success');
 

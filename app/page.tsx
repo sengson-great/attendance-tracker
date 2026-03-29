@@ -62,11 +62,11 @@ export default function Home() {
           className="text-center max-w-3xl mx-auto"
         >
           <h1 className="text-6xl font-bold mb-6">
-            <span className="text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text leading-relaxed py-2 inline-block">
+            <span className="text-transparent bg-linear-to-r from-blue-600 to-indigo-600 bg-clip-text leading-relaxed py-2 inline-block">
               {translations.title}
             </span>
             <br />
-            <span className="text-transparent bg-gradient-to-r from-gray-400 to-gray-600 bg-clip-text leading-relaxed py-2 inline-block">
+            <span className="text-transparent bg-linear-to-r from-gray-400 to-gray-600 bg-clip-text leading-relaxed py-2 inline-block">
               {translations.subtitle}
             </span>
           </h1>

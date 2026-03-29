@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Lock, Shield, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@supabase/supabase-js';
 import Link from 'next/link';
 
 // Khmer translations
@@ -21,17 +20,9 @@ const translations = {
   backToHome: 'ត្រឡប់ទៅទំព័រដើម',
   attemptsRemaining: 'នៅសល់ {{attempts}} ដង',
   loading: 'កំពុងផ្ទុក...',
-  errorFetchingPin: 'មិនអាចផ្ទុក PIN បានទេ។ សូមពិនិត្យការតភ្ជាប់។',
-  pinNotFound: 'មិនមាន PIN ក្នុងប្រព័ន្ធ។ សូមទាក់ទងអ្នកគ្រប់គ្រង។',
-  databaseError: 'កំហុសប្រព័ន្ធទិន្នន័យ',
+  serverError: 'មានបញ្ហាក្នុងការតភ្ជាប់។ សូមព្យាយាមម្តងទៀត។',
   retry: 'សូមព្យាយាមម្តងទៀត'
 };
-
-// Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_MINUTES = 15;
@@ -45,78 +36,8 @@ export default function AdminLogin() {
   const [attempts, setAttempts] = useState(0);
   const [isLocked, setIsLocked] = useState(false);
   const [lockTimer, setLockTimer] = useState<number | null>(null);
-  const [correctPin, setCorrectPin] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [dbError, setDbError] = useState<string | null>(null);
 
-  // Load admin PIN from database with detailed logging
   useEffect(() => {
-    const loadAdminPin = async () => {
-      console.log('🔵 Loading admin PIN from database...');
-      console.log('🔵 Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
-      
-      try {
-        const { data, error, status, statusText } = await supabase
-          .from('school_settings')
-          .select('admin_pin, id, school_name')
-          .eq('id', 1)
-          .maybeSingle();
-
-        console.log('📥 Supabase Response:');
-        console.log('  - Status:', status);
-        console.log('  - Status Text:', statusText);
-        console.log('  - Error:', error);
-        console.log('  - Data:', data);
-
-        if (error) {
-          console.error('❌ Database error:', error);
-          setDbError(`${translations.databaseError}: ${error.message}`);
-          setError(translations.errorFetchingPin);
-          setCorrectPin(null);
-        } else if (!data) {
-          console.log('⚠️ No data found for id=1 in school_settings table');
-          setDbError(translations.pinNotFound);
-          setError(translations.pinNotFound);
-          setCorrectPin(null);
-        } else {
-          console.log('✅ PIN loaded successfully:', data.admin_pin);
-          console.log('  - School name:', data.school_name);
-          console.log('  - Record ID:', data.id);
-          setCorrectPin(data.admin_pin);
-          setDbError(null);
-        }
-      } catch (err) {
-        console.error('❌ Unexpected error loading PIN:', err);
-        setDbError(err instanceof Error ? err.message : 'Unknown error');
-        setError(translations.errorFetchingPin);
-        setCorrectPin(null);
-      } finally {
-        setIsLoading(false);
-        console.log('🏁 PIN loading completed. Correct PIN:', correctPin ? 'Set' : 'Not set');
-      }
-    };
-
-    loadAdminPin();
-  }, []);
-
-  // Check if already logged in
-  useEffect(() => {
-    console.log('🔍 Checking existing session...');
-    const adminSession = localStorage.getItem('admin_session');
-    if (adminSession) {
-      const session = JSON.parse(adminSession);
-      console.log('  - Session found, expires:', new Date(session.expires));
-      if (session.expires > Date.now()) {
-        console.log('  - Session valid, redirecting to admin');
-        router.push('/admin');
-      } else {
-        console.log('  - Session expired, removing');
-        localStorage.removeItem('admin_session');
-      }
-    } else {
-      console.log('  - No session found');
-    }
-
     // Load attempts from storage
     const storedAttempts = localStorage.getItem('admin_attempts');
     if (storedAttempts) {
@@ -124,22 +45,18 @@ export default function AdminLogin() {
       const timeSince = Date.now() - timestamp;
       const lockoutMs = LOCKOUT_MINUTES * 60 * 1000;
       
-      console.log(`  - Attempts: ${count}, Time since last attempt: ${Math.floor(timeSince / 1000)}s`);
-      
       if (timeSince < lockoutMs) {
         setAttempts(count);
         if (count >= MAX_ATTEMPTS) {
           setIsLocked(true);
           const remainingMinutes = Math.ceil((lockoutMs - timeSince) / 60000);
           setLockTimer(remainingMinutes);
-          console.log(`  - Account locked for ${remainingMinutes} minutes`);
         }
       } else {
-        console.log('  - Clearing old attempts');
         localStorage.removeItem('admin_attempts');
       }
     }
-  }, [router]);
+  }, []);
 
   // Countdown timer for lockout
   useEffect(() => {
@@ -147,7 +64,6 @@ export default function AdminLogin() {
       const timer = setTimeout(() => {
         setLockTimer(lockTimer - 1);
         if (lockTimer <= 1) {
-          console.log('🔓 Lockout period ended');
           setIsLocked(false);
           setAttempts(0);
           localStorage.removeItem('admin_attempts');
@@ -183,12 +99,10 @@ export default function AdminLogin() {
 
   const handleSubmit = async () => {
     if (isLocked) {
-      console.log('⛔ Attempt blocked - account locked');
       return;
     }
 
     const enteredPin = pin.join('');
-    console.log('🔑 PIN entered:', enteredPin);
     
     if (enteredPin.length !== 4) {
       setError('សូមបញ្ចូល PIN ៤ ខ្ទង់');
@@ -198,30 +112,22 @@ export default function AdminLogin() {
     setLoading(true);
 
     try {
-      if (correctPin === null) {
-        console.log('❌ Cannot verify - PIN not loaded');
-        setError(translations.errorFetchingPin);
-        setLoading(false);
-        return;
-      }
-
-      console.log(`🔐 Verifying PIN: entered=${enteredPin}, correct=${correctPin}`);
+      const response = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: enteredPin })
+      });
       
-      if (enteredPin === correctPin) {
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
         // Successful login
-        console.log('✅ PIN correct - creating session');
-        const session = {
-          authenticated: true,
-          expires: Date.now() + 24 * 60 * 60 * 1000 // 24 hours
-        };
-        localStorage.setItem('admin_session', JSON.stringify(session));
         localStorage.removeItem('admin_attempts');
-        console.log('📝 Session created, redirecting...');
         router.push('/admin');
+        router.refresh();
       } else {
         // Failed attempt
         const newAttempts = attempts + 1;
-        console.log(`❌ PIN incorrect - attempt ${newAttempts}/${MAX_ATTEMPTS}`);
         setAttempts(newAttempts);
         
         localStorage.setItem('admin_attempts', JSON.stringify({
@@ -230,7 +136,6 @@ export default function AdminLogin() {
         }));
 
         if (newAttempts >= MAX_ATTEMPTS) {
-          console.log('🔒 Max attempts reached - locking account');
           setIsLocked(true);
           setLockTimer(LOCKOUT_MINUTES);
           setError(translations.errorLocked.replace('{{minutes}}', LOCKOUT_MINUTES.toString()));
@@ -243,23 +148,12 @@ export default function AdminLogin() {
         document.getElementById('pin-0')?.focus();
       }
     } catch (error) {
-      console.error('💥 Login error:', error);
-      setError('មានបញ្ហាក្នុងការតភ្ជាប់។ សូមព្យាយាមម្តងទៀត។');
+      console.error('Login error:', error);
+      setError(translations.serverError);
     } finally {
       setLoading(false);
     }
   };
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">{translations.loading}</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
@@ -274,14 +168,6 @@ export default function AdminLogin() {
           </div>
           <h1 className="text-2xl font-bold text-gray-800">{translations.title}</h1>
           <p className="text-gray-500 mt-2">{translations.subtitle}</p>
-          
-          {/* Debug info - remove in production */}
-          {process.env.NODE_ENV === 'development' && dbError && (
-            <div className="mt-2 p-2 bg-gray-100 rounded text-xs text-left">
-              <p className="font-mono text-red-600">Debug: {dbError}</p>
-              <p className="font-mono text-gray-500 mt-1">PIN Loaded: {correctPin ? 'Yes' : 'No'}</p>
-            </div>
-          )}
         </div>
 
         <div className="space-y-6">
@@ -300,9 +186,9 @@ export default function AdminLogin() {
                   value={digit}
                   onChange={(e) => handlePinChange(index, e.target.value)}
                   onKeyDown={(e) => handleKeyDown(index, e)}
-                  disabled={loading || isLocked || correctPin === null}
+                  disabled={loading || isLocked}
                   className="w-14 h-14 text-center text-2xl font-bold border-2 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 disabled:bg-gray-100"
-                  autoFocus={index === 0 && correctPin !== null}
+                  autoFocus={index === 0}
                 />
               ))}
             </div>
@@ -341,7 +227,7 @@ export default function AdminLogin() {
           )}
 
           {/* Attempts Remaining */}
-          {!isLocked && attempts > 0 && correctPin !== null && (
+          {!isLocked && attempts > 0 && (
             <p className="text-center text-sm text-orange-600">
               {translations.attemptsRemaining.replace('{{attempts}}', (MAX_ATTEMPTS - attempts).toString())}
             </p>
@@ -360,7 +246,7 @@ export default function AdminLogin() {
           {/* Login Button */}
           <button
             onClick={handleSubmit}
-            disabled={loading || isLocked || correctPin === null}
+            disabled={loading || isLocked}
             className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (
@@ -382,16 +268,6 @@ export default function AdminLogin() {
               ← {translations.backToHome}
             </Link>
           </div>
-
-          {/* Retry button if PIN not loaded */}
-          {correctPin === null && !isLoading && (
-            <button
-              onClick={() => window.location.reload()}
-              className="w-full text-sm text-blue-600 hover:text-blue-700 mt-2"
-            >
-              {translations.retry}
-            </button>
-          )}
         </div>
       </motion.div>
     </div>

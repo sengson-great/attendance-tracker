@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 
 const TELEGRAM_CONFIG = {
   enabled: true,
@@ -15,6 +16,15 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     console.log("📦 Request body:", JSON.stringify(body, null, 2));
+
+    // For test and custom messages, verify admin authentication to prevent SSRF and unauthenticated proxying
+    if (body.type === "test" || (body.type !== "checkin" && !body.employeeName && !body.teacherName)) {
+      const cookieStore = await cookies();
+      const session = cookieStore.get('admin_session');
+      if (!session || session.value !== 'authenticated') {
+        return NextResponse.json({ success: false, error: "Unauthorized access: Admin session required." }, { status: 401 });
+      }
+    }
 
     // Check for employeeName or teacherName (support both)
     if (body.employeeName || body.teacherName || body.type === "checkin") {
@@ -169,6 +179,11 @@ async function sendTelegramMessage(
 ) {
   const chatId = customChatId || TELEGRAM_CONFIG.chatId;
   const botToken = customBotToken || TELEGRAM_CONFIG.botToken;
+
+  // Validate bot token to prevent SSRF vulnerabilities and Path Traversal
+  if (botToken && !/^[a-zA-Z0-9:_-]+$/.test(botToken)) {
+    return NextResponse.json({ success: false, error: "Invalid botToken format" }, { status: 400 });
+  }
 
   if (!TELEGRAM_CONFIG.enabled && !customChatId) {
     console.log("ℹ️ Telegram notifications are disabled");
