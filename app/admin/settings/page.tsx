@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { updateSchoolSettingsAction } from '../../actions';
+import { updateSchoolSettingsAction, getAdminSchoolSettingsAction, verifyPinAction } from '../../actions';
 
 // Khmer translations
 const translations = {
@@ -136,12 +136,6 @@ interface SchoolSettings {
   school_start_hour: number;
   school_start_minute: number;
   grace_period: number;
-  telegram_enabled: boolean;
-  telegram_bot_token: string;
-  telegram_chat_id: string;
-  telegram_notify_on_time: boolean;
-  telegram_notify_late: boolean;
-  telegram_notify_very_late: boolean;
 }
 
 export default function SettingsPage() {
@@ -162,13 +156,7 @@ export default function SettingsPage() {
     admin_pin: '1234',
     school_start_hour: 7,
     school_start_minute: 0,
-    grace_period: 5,
-    telegram_enabled: false,
-    telegram_bot_token: '',
-    telegram_chat_id: '',
-    telegram_notify_on_time: false,
-    telegram_notify_late: true,
-    telegram_notify_very_late: true
+    grace_period: 5
   });
 
   // PIN change states
@@ -201,13 +189,7 @@ export default function SettingsPage() {
 
   const loadSettings = async () => {
     try {
-      const { data, error } = await supabase
-        .from('school_settings')
-        .select('*')
-        .eq('id', 1)
-        .single();
-
-      if (error && error.code !== 'PGRST116') throw error;
+      const data = await getAdminSchoolSettingsAction();
 
       if (data) {
         setSettings({
@@ -216,16 +198,10 @@ export default function SettingsPage() {
           latitude: data.latitude || 0,
           longitude: data.longitude || 0,
           allowed_radius: data.allowed_radius || 100,
-          admin_pin: data.admin_pin,
+          admin_pin: '1234', // Hide pin from client
           school_start_hour: data.school_start_hour || 7,
           school_start_minute: data.school_start_minute || 0,
-          grace_period: data.grace_period || 5,
-          telegram_enabled: data.telegram_enabled || false,
-          telegram_bot_token: data.telegram_bot_token || '',
-          telegram_chat_id: data.telegram_chat_id || '',
-          telegram_notify_on_time: data.telegram_notify_on_time || false,
-          telegram_notify_late: data.telegram_notify_late !== false,
-          telegram_notify_very_late: data.telegram_notify_very_late !== false
+          grace_period: data.grace_period || 5
         });
       }
     } catch (error) {
@@ -236,9 +212,10 @@ export default function SettingsPage() {
     }
   };
 
-  const handlePinSubmit = () => {
+  const handlePinSubmit = async () => {
     const enteredPin = pinInput.join('');
-    if (enteredPin === settings.admin_pin) {
+    const isValid = await verifyPinAction(enteredPin);
+    if (isValid) {
       setIsAuthenticated(true);
       sessionStorage.setItem('settings_auth', 'true');
       setPinError(null);
@@ -308,12 +285,6 @@ export default function SettingsPage() {
         school_start_hour: settings.school_start_hour,
         school_start_minute: settings.school_start_minute,
         grace_period: settings.grace_period,
-        telegram_enabled: settings.telegram_enabled,
-        telegram_bot_token: settings.telegram_bot_token,
-        telegram_chat_id: settings.telegram_chat_id,
-        telegram_notify_on_time: settings.telegram_notify_on_time,
-        telegram_notify_late: settings.telegram_notify_late,
-        telegram_notify_very_late: settings.telegram_notify_very_late,
         updated_at: new Date().toISOString()
       });
 
@@ -386,20 +357,13 @@ export default function SettingsPage() {
   };
 
   const testTelegram = async () => {
-    if (!settings.telegram_bot_token || !settings.telegram_chat_id) {
-      setMessage({ type: 'error', text: 'សូមកំណត់ Bot Token និង Chat ID ជាមុន' });
-      return;
-    }
-
     setTestingTelegram(true);
     try {
       const response = await fetch('/api/send-telegram', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          chatId: settings.telegram_chat_id,
-          botToken: settings.telegram_bot_token,
-          message: '*✅ សាកល្បងការតភ្ជាប់តេឡេក្រាម*\n\n📊 *ប្រព័ន្ធ:* ការកំណត់\n✨ *ស្ថានភាព:* ដំណើរការល្អ!'
+          type: 'test'
         })
       });
 
@@ -521,7 +485,6 @@ export default function SettingsPage() {
             {[
               { id: 'location', icon: MapPin, label: translations.tabLocation },
               { id: 'late', icon: Clock, label: translations.tabLate },
-              { id: 'telegram', icon: Send, label: translations.tabTelegram },
               { id: 'security', icon: Shield, label: translations.tabSecurity }
             ].map((tab) => (
               <button
@@ -722,106 +685,6 @@ export default function SettingsPage() {
                     <li>• {translations.veryLateRule}: 31+ {translations.minutesAfterStart}</li>
                   </ul>
                 </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Telegram Settings Tab */}
-          {activeTab === 'telegram' && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-white rounded-xl shadow-sm p-6"
-            >
-              <h2 className="text-lg font-semibold mb-2 flex items-center text-black">
-                <Send className="h-5 w-5 text-indigo-600 mr-2" />
-                {translations.telegramTitle}
-              </h2>
-              <p className="text-sm text-gray-500 mb-6">{translations.telegramSubtitle}</p>
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-700">{translations.enableTelegram}</span>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {translations.botToken}
-                  </label>
-                  <input
-                    type="text"
-                    value={settings.telegram_bot_token}
-                    onChange={(e) => setSettings({ ...settings, telegram_bot_token: e.target.value })}
-                    className="w-full border rounded-lg px-4 py-2 text-black"
-                    placeholder={translations.botTokenPlaceholder}
-                  />
-                  <p className="text-xs text-gray-500 mt-1">{translations.botTokenHelp}</p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {translations.chatId}
-                  </label>
-                  <input
-                    type="text"
-                    value={settings.telegram_chat_id}
-                    onChange={(e) => setSettings({ ...settings, telegram_chat_id: e.target.value })}
-                    className="w-full border rounded-lg px-4 py-2 text-black"
-                    placeholder={translations.chatIdPlaceholder}
-                  />
-                  <p className="text-xs text-gray-500 mt-1">{translations.chatIdHelp}</p>
-                </div>
-
-                <div className="border-t pt-4">
-                  <h3 className="font-medium mb-3 text-black">{translations.notifyWhen}</h3>
-                  <div className="space-y-2">
-                    <label className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        checked={settings.telegram_notify_on_time}
-                        onChange={(e) => setSettings({ ...settings, telegram_notify_on_time: e.target.checked })}
-                        className="rounded text-blue-600"
-                      />
-                      <span className="text-sm text-gray-700">{translations.notifyOnTime}</span>
-                    </label>
-                    <label className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        checked={settings.telegram_notify_late}
-                        onChange={(e) => setSettings({ ...settings, telegram_notify_late: e.target.checked })}
-                        className="rounded text-blue-600"
-                      />
-                      <span className="text-sm text-gray-700">{translations.notifyLate}</span>
-                    </label>
-                    <label className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        checked={settings.telegram_notify_very_late}
-                        onChange={(e) => setSettings({ ...settings, telegram_notify_very_late: e.target.checked })}
-                        className="rounded text-blue-600"
-                      />
-                      <span className="text-sm text-gray-700">{translations.notifyVeryLate}</span>
-                    </label>
-                  </div>
-                </div>
-
-                <button
-                  onClick={testTelegram}
-                  disabled={testingTelegram}
-                  className="w-full flex items-center justify-center px-4 py-2 border-2 border-indigo-600 text-indigo-600 rounded-lg hover:bg-indigo-50 transition-colors disabled:opacity-50"
-                >
-                  {testingTelegram ? (
-                    <>
-                      <Loader className="h-4 w-4 animate-spin mr-2" />
-                      {translations.saving}
-                    </>
-                  ) : (
-                    <>
-                      <MessageSquare className="h-4 w-4 mr-2" />
-                      {translations.testConnection}
-                    </>
-                  )}
-                </button>
               </div>
             </motion.div>
           )}

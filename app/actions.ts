@@ -2,6 +2,8 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
+import { verifySession } from '@/lib/auth';
+import { processCheckinNotification } from '@/lib/telegram';
 
 // Create a high-privilege Supabase client using the Service Role Key
 // This allows the server to bypass RLS for necessary writes.
@@ -24,7 +26,11 @@ function getAdminSupabase() {
 async function verifyAdmin() {
   const cookieStore = await cookies();
   const session = cookieStore.get('admin_session');
-  if (!session || session.value !== 'authenticated') {
+  if (!session?.value) {
+    throw new Error('Unauthorized');
+  }
+  const payload = await verifySession(session.value);
+  if (!payload?.admin) {
     throw new Error('Unauthorized');
   }
 }
@@ -57,6 +63,29 @@ export async function deleteEmployeeAction(id: string) {
   return true;
 }
 
+export async function getAdminSchoolSettingsAction() {
+  await verifyAdmin();
+  const supabase = getAdminSupabase();
+  const { data, error } = await supabase
+    .from('school_settings')
+    .select('school_name, latitude, longitude, allowed_radius, school_start_hour, school_start_minute, grace_period')
+    .eq('id', 1)
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function verifyPinAction(pin: string) {
+  await verifyAdmin();
+  const supabase = getAdminSupabase();
+  const { data } = await supabase
+    .from('school_settings')
+    .select('admin_pin')
+    .eq('id', 1)
+    .single();
+  return data?.admin_pin === pin;
+}
+
 export async function updateSchoolSettingsAction(settingsData: any) {
   await verifyAdmin();
   const supabase = getAdminSupabase();
@@ -65,13 +94,16 @@ export async function updateSchoolSettingsAction(settingsData: any) {
   return true;
 }
 
-export async function fetchAdminDataAction() {
+export async function fetchAdminDataAction(selectedDate?: string) {
   await verifyAdmin();
   const supabase = getAdminSupabase();
+
+  let attendanceQuery = supabase.from('attendance').select('*').order('check_in');
+  if (selectedDate) attendanceQuery = attendanceQuery.eq('date', selectedDate);
   
   const [employeesRaw, attendanceRaw, settingsRaw] = await Promise.all([
     supabase.from('employees').select('*').eq('active', true).order('full_name'),
-    supabase.from('attendance').select('*').order('check_in'),
+    attendanceQuery,
     supabase.from('school_settings').select('school_start_hour, school_start_minute, grace_period').eq('id', 1).single()
   ]);
 
@@ -85,6 +117,28 @@ export async function fetchAdminDataAction() {
 // ----------------------------------------------------
 // Public Secure Actions (No admin session required)
 // ----------------------------------------------------
+
+export async function getPublicEmployeesAction() {
+  const supabase = getAdminSupabase();
+  const { data, error } = await supabase
+    .from('employees')
+    .select('id, employee_id, full_name, department, emoji')
+    .eq('active', true)
+    .order('full_name');
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function getPublicSchoolSettingsAction() {
+  const supabase = getAdminSupabase();
+  const { data, error } = await supabase
+    .from('school_settings')
+    .select('latitude, longitude, allowed_radius')
+    .eq('id', 1)
+    .single();
+  if (error) throw new Error(error.message);
+  return data;
+}
 
 export async function recordAttendanceAction(attendanceData: any) {
   // We don't check verifyAdmin() because /scan is public.
@@ -141,6 +195,40 @@ export async function recordAttendanceAction(attendanceData: any) {
       minutes = diffMinutes;
     }
   }
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371e3; // Earth's radius in meters
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+      Math.cos(φ1) * Math.cos(φ2) *
+      Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return Math.round(R * c);
+  };
+
+  let isVerified = false;
+  let serverDistance = null;
+
+  if (config && attendanceData.location_lat && attendanceData.location_lng) {
+    const { latitude, longitude, allowed_radius } = config as any;
+    if (latitude && longitude && allowed_radius) {
+      serverDistance = calculateDistance(
+        attendanceData.location_lat, attendanceData.location_lng,
+        latitude, longitude
+      );
+      if (serverDistance <= allowed_radius) {
+        isVerified = true;
+      } else {
+        throw new Error("Location spoofing detected. Outside allowed radius.");
+      }
+    }
+  } else if (config && (config as any).allowed_radius) {
+     throw new Error("Location coordinates missing on server verification.");
+  }
 
   // Safely insert exact permitted fields
   const safeData = {
@@ -151,8 +239,8 @@ export async function recordAttendanceAction(attendanceData: any) {
     location: attendanceData.location || "ច្រកចូលក្រុមហ៊ុន ឬស្ថាប័ន",
     location_lat: attendanceData.location_lat,
     location_lng: attendanceData.location_lng,
-    location_verified: attendanceData.location_verified,
-    distance_from_school: attendanceData.distance_from_school,
+    location_verified: isVerified,
+    distance_from_school: serverDistance,
     verification_method: ['gps'],
     status: status
   };
@@ -166,6 +254,16 @@ export async function recordAttendanceAction(attendanceData: any) {
   if (error) {
     console.error("Supabase Error (recordAttendance):", error);
     throw new Error(JSON.stringify(error));
+  }
+  
+  // Asynchronously dispatch the telegram message securely from the backend!
+  try {
+    processCheckinNotification({
+      ...safeData,
+      lateMinutes: minutes
+    }).catch(e => console.error('Telegram notification error:', e));
+  } catch (e) {
+    // We don't fail the checkin just because telegram failed
   }
 
   return { attendance: newAttendance, status, minutes };

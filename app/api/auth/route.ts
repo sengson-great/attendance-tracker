@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
+import { signSession } from '@/lib/auth';
 
 export async function POST(request: Request) {
   try {
@@ -30,10 +31,11 @@ export async function POST(request: Request) {
     
     if (data && data.admin_pin === pin) {
       // Create session cookie asynchronously
+      const token = await signSession({ admin: true });
       const cookieStore = await cookies();
       cookieStore.set({
         name: 'admin_session',
-        value: 'authenticated',
+        value: token,
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
@@ -44,6 +46,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true });
     }
     
+    // Add artificial delay to mitigate brute force attacks on the PIN
+    await new Promise(resolve => setTimeout(resolve, 1000));
     return NextResponse.json({ success: false, error: 'Invalid PIN' }, { status: 401 });
   } catch (err) {
     return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 });

@@ -2,15 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { addEmployeeAction, deleteEmployeeAction, updateSchoolSettingsAction } from '../actions';
 import { motion } from 'framer-motion';
+import { addEmployeeAction, deleteEmployeeAction, updateSchoolSettingsAction, fetchAdminDataAction } from '../actions';
 import {
     Users, UserCheck, UserX, Clock, Calendar,
     Download, Plus, Search, Printer, Trash2,
     AlertTriangle, Timer, Coffee, Settings,
     Send, MessageSquare, Bell, MapPin, LogOut
 } from 'lucide-react';
-import QRCode from 'qrcode';
 import Link from 'next/link';
 
 // Khmer translations
@@ -187,7 +186,6 @@ interface Stats {
 
 interface TelegramConfig {
     enabled: boolean;
-    botToken: string;
     chatId: string;
     notifyOnTime: boolean;
     notifyLate: boolean;
@@ -285,8 +283,7 @@ export default function AdminPage() {
     });
     const [telegramConfig, setTelegramConfig] = useState<TelegramConfig>({
         enabled: true,
-        botToken: process.env.TELEGRAM_BOT_TOKEN || '',
-        chatId: process.env.TELEGRAM_CHAT_ID || '',
+        chatId: '',
         notifyOnTime: false,
         notifyLate: true,
         notifyVeryLate: true,
@@ -300,35 +297,7 @@ export default function AdminPage() {
     const [loading, setLoading] = useState(false);
     const [telegramStatus, setTelegramStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
 
-    // Load settings in useEffect
-    useEffect(() => {
-        const loadSettings = async () => {
-            const { data } = await supabase
-                .from('school_settings')
-                .select('school_start_hour, school_start_minute, grace_period')
-                .eq('id', 1)
-                .single();
-
-            if (data) {
-                setLateConfig({
-                    schoolStartHour: data.school_start_hour,
-                    schoolStartMinute: data.school_start_minute,
-                    gracePeriod: data.grace_period
-                });
-            }
-        };
-        loadSettings();
-
-        // Load telegram config from local storage to prevent it from resetting on refresh
-        const savedTelegramConfig = localStorage.getItem('telegramConfig');
-        if (savedTelegramConfig) {
-            try {
-                setTelegramConfig(JSON.parse(savedTelegramConfig));
-            } catch (e) {
-                console.error("Error parsing telegram config from storage", e);
-            }
-        }
-    }, []);
+    // Removed duplicate loadSettings effect
 
     useEffect(() => {
         loadData();
@@ -342,7 +311,7 @@ export default function AdminPage() {
                     schema: 'public',
                     table: 'attendance'
                 },
-                async (payload) => {
+                async (payload: any) => {
                     console.log('New attendance record detected:', payload);
                     // Reload data to update stats
                     await loadData();
@@ -350,7 +319,7 @@ export default function AdminPage() {
                     await sendTelegramNotification(payload.new);
                 }
             )
-            .subscribe((status) => {
+            .subscribe((status: any) => {
                 console.log('Subscription status:', status);
             });
 
@@ -360,14 +329,14 @@ export default function AdminPage() {
     }, [selectedDate, telegramConfig]);
 
     // Calculate late status based on check-in time
-    const calculateLateStatus = (checkInTime: string): { status: 'on-time' | 'late' | 'very-late', minutes: number } => {
+    const calculateLateStatus = (checkInTime: string, config: any): { status: 'on-time' | 'late' | 'very-late', minutes: number } => {
         const checkIn = new Date(checkInTime);
         const startTime = new Date(checkIn);
-        startTime.setHours(lateConfig.schoolStartHour, lateConfig.schoolStartMinute, 0);
+        startTime.setHours(config.schoolStartHour, config.schoolStartMinute, 0);
 
         const diffMinutes = Math.floor((checkIn.getTime() - startTime.getTime()) / (1000 * 60));
 
-        if (diffMinutes <= lateConfig.gracePeriod) {
+        if (diffMinutes <= config.gracePeriod) {
             return { status: 'on-time', minutes: 0 };
         } else if (diffMinutes <= 30) {
             return { status: 'late', minutes: diffMinutes };
@@ -379,25 +348,29 @@ export default function AdminPage() {
     const loadData = async () => {
         setLoading(true);
         try {
-            // Load employees
-            const { data: employeesData } = await supabase
-                .from('employees')
-                .select('*')
-                .eq('active', true)
-                .order('full_name');
+            const data = await fetchAdminDataAction(selectedDate);
+            
+            const employeesData = data.employees;
+            const attendanceData = data.attendance;
+            
+            if (data.settings) {
+                setLateConfig({
+                    schoolStartHour: data.settings.school_start_hour,
+                    schoolStartMinute: data.settings.school_start_minute,
+                    gracePeriod: data.settings.grace_period
+                });
+            }
 
             setEmployees(employeesData || []);
 
-            // Load attendance for selected date
-            const { data: attendanceData } = await supabase
-                .from('attendance')
-                .select('*')
-                .eq('date', selectedDate)
-                .order('check_in');
-
             // Process attendance with late status
             const processedAttendance = (attendanceData || []).map(record => {
-                const { status, minutes } = calculateLateStatus(record.check_in);
+                const config = data.settings ? {
+                    schoolStartHour: data.settings.school_start_hour,
+                    schoolStartMinute: data.settings.school_start_minute,
+                    gracePeriod: data.settings.grace_period
+                } : lateConfig;
+                const { status, minutes } = calculateLateStatus(record.check_in, config);
                 return {
                     ...record,
                     status,
@@ -434,62 +407,20 @@ export default function AdminPage() {
     };
 
     const sendTelegramNotification = async (attendanceRecord: any) => {
-        // Check if Telegram is enabled
-        if (!telegramConfig.enabled) {
-            console.log('Telegram is disabled');
-            return;
-        }
-
-        // Check if we have the required config
-        if (!telegramConfig.botToken || !telegramConfig.chatId) {
-            console.log('Telegram not configured properly');
-            return;
-        }
-
-        // Calculate late status for this record
-        const { status, minutes } = calculateLateStatus(attendanceRecord.check_in);
-
-        // Check if we should notify based on status
-        if (status === 'on-time' && !telegramConfig.notifyOnTime) {
-            console.log('On-time notifications are disabled');
-            return;
-        }
-        if (status === 'late' && !telegramConfig.notifyLate) {
-            console.log('Late notifications are disabled');
-            return;
-        }
-        if (status === 'very-late' && !telegramConfig.notifyVeryLate) {
-            console.log('Very late notifications are disabled');
-            return;
-        }
-
         setTelegramStatus('sending');
-
-        // Get status emoji and label
-        const statusEmoji = status === 'on-time' ? '✅' : status === 'late' ? '⚠️' : '🔴';
-        const statusLabel = status === 'on-time' ? 'ទាន់ពេល' : status === 'late' ? 'យឺត' : 'យឺតខ្លាំង';
-
-        const message = `
-*🏫 ចុះវត្តមានថ្មី*
-
-👤 *បុគ្គលិក:* ${attendanceRecord.employee_name}
-🆔 *លេខសម្គាល់:* ${attendanceRecord.employee_id}
-⏰ *ម៉ោង:* ${new Date(attendanceRecord.check_in).toLocaleTimeString('km-KH')}
-📊 *ស្ថានភាព:* ${statusEmoji} ${statusLabel}
-${minutes > 0 ? `⏱️ *យឺត:* ${formatMinutes(minutes)}` : ''}
-📅 *កាលបរិច្ឆេទ:* ${formatKhmerDateLong(new Date())}
-    `;
-
-        console.log('Sending Telegram message:', message);
 
         try {
             const response = await fetch('/api/send-telegram', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    chatId: telegramConfig.chatId,
-                    message: message.trim(),
-                    botToken: telegramConfig.botToken
+                    type: 'checkin',
+                    employeeName: attendanceRecord.employee_name,
+                    employeeId: attendanceRecord.employee_id,
+                    checkInTime: attendanceRecord.check_in,
+                    status: attendanceRecord.status,
+                    lateMinutes: attendanceRecord.late_minutes,
+                    distance: attendanceRecord.distance_from_school
                 })
             });
 
@@ -511,11 +442,6 @@ ${minutes > 0 ? `⏱️ *យឺត:* ${formatMinutes(minutes)}` : ''}
     };
 
     const sendDailySummary = async () => {
-        if (!telegramConfig.enabled || !telegramConfig.botToken || !telegramConfig.chatId) {
-            alert(translations.telegramNotConfigured);
-            return;
-        }
-
         setTelegramStatus('sending');
 
         const attendanceList = attendance.map(a => {
@@ -543,9 +469,7 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    chatId: telegramConfig.chatId,
-                    message: message.trim(),
-                    botToken: telegramConfig.botToken
+                    message: message.trim()
                 })
             });
 
@@ -565,28 +489,14 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
     };
 
     const testTelegramConnection = async () => {
-        if (!telegramConfig.botToken || !telegramConfig.chatId) {
-            alert(translations.telegramNotConfigured);
-            return;
-        }
-
         setTelegramStatus('sending');
-
-        const message = `
-*✅ សាកល្បងការតភ្ជាប់តេឡេក្រាម*
-🕐 *ម៉ោង:* ${new Date().toLocaleTimeString('km-KH')}
-📊 *ប្រព័ន្ធ:* ចុះវត្តមានក្រុមហ៊ុន ឬស្ថាប័ន
-✨ *ស្ថានភាព:* ដំណើរការល្អ!
-    `;
 
         try {
             const response = await fetch('/api/send-telegram', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    chatId: telegramConfig.chatId,
-                    message: message.trim(),
-                    botToken: telegramConfig.botToken
+                    type: 'test'
                 })
             });
 
@@ -661,187 +571,192 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
         // Automatically grab the Vercel URL you are currently on!
         const qrData = `${window.location.origin}/scan?qr=SCHOOL_ATTENDANCE`;
 
-        QRCode.toDataURL(qrData, {
-            width: 300,
-            margin: 2,
-            color: {
-                dark: '#4F46E5',
-                light: '#FFFFFF'
-            }
-        }, (err, url) => {
-            if (err) {
-                alert(translations.qrError);
-                return;
-            }
+        import('qrcode').then((QRCode) => {
+            QRCode.toDataURL(qrData, {
+                width: 300,
+                margin: 2,
+                color: {
+                    dark: '#4F46E5',
+                    light: '#FFFFFF'
+                }
+            }, (err, url) => {
+                if (err) {
+                    alert(translations.qrError);
+                    return;
+                }
 
-            const win = window.open('', '_blank');
-            if (!win) {
-                alert(translations.popupBlocked);
-                return;
-            }
+                const win = window.open('', '_blank');
+                if (!win) {
+                    alert(translations.popupBlocked);
+                    return;
+                }
 
-            win.document.documentElement.innerHTML = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>School Attendance QR Code</title>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <style>
-              * {
-                margin: 0;
-                padding: 0;
-                box-sizing: border-box;
-              }
-              body { 
-                text-align: center; 
-                padding: 20px; 
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                background: #f0f9ff;
-                min-height: 100vh;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-              }
-              .container {
-                max-width: 500px;
-                margin: 0 auto;
-                background: white;
-                padding: 40px 20px;
-                border-radius: 30px;
-                box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-              }
-              h1 { 
-                color: #4F46E5; 
-                font-size: 32px;
-                margin-bottom: 10px;
-              }
-              h2 { 
-                color: #1f2937; 
-                font-size: 24px;
-                margin-bottom: 20px;
-                font-weight: normal;
-              }
-              .qr-code {
-                background: white;
-                padding: 20px;
-                border-radius: 20px;
-                border: 4px solid #4F46E5;
-                margin: 30px 0;
-                display: inline-block;
-              }
-              .qr-code img {
-                width: 250px;
-                height: 250px;
-                display: block;
-              }
-              .instructions {
-                text-align: left;
-                background: #f3f4f6;
-                padding: 25px;
-                border-radius: 15px;
-                margin: 30px 0;
-              }
-              .instructions h3 {
-                color: #4F46E5;
-                margin-bottom: 15px;
-                font-size: 20px;
-              }
-              .instructions ol {
-                margin-left: 20px;
-                line-height: 2;
-                color: #4b5563;
-              }
-              .instructions li {
-                margin-bottom: 10px;
-              }
-              .button {
-                background: #4F46E5;
-                color: white;
-                border: none;
-                padding: 15px 40px;
-                font-size: 18px;
-                font-weight: 600;
-                border-radius: 50px;
-                cursor: pointer;
-                margin: 20px 0;
-                transition: transform 0.2s;
-              }
-              .button:hover {
-                transform: scale(1.05);
-              }
-              .footer {
-                color: #9ca3af;
-                font-size: 14px;
-                margin-top: 30px;
-              }
-              @media print {
-                .button { display: none; }
-                body { background: white; padding: 0; }
-                .container { box-shadow: none; padding: 20px; }
-              }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <h1>🏫 ចុះវត្តមានក្រុមហ៊ុន ឬស្ថាប័ន</h1>
-              <h2>QR មួយសម្រាប់បុគ្គលិកទាំងអស់</h2>
-              
-              <div class="qr-code">
-                <img src="${url}" alt="School QR Code" />
-              </div>
-              
-              <div style="font-size: 28px; font-weight: bold; color: #4F46E5; margin: 20px 0;">
-                ស្កេនដើម្បីចុះវត្តមាន
-              </div>
-              
-              <div class="instructions">
-                <h3>📋 របៀបប្រើប្រាស់:</h3>
-                <ol>
-                  <li>ដាក់ QR code នេះនៅច្រកចូលក្រុមហ៊ុន ឬស្ថាប័ន</li>
-                  <li>បុគ្គលិកស្កេនជាមួយកាមេរ៉ាទូរស័ព្ទ</li>
-                  <li>ជ្រើសរើសឈ្មោះរបស់ពួកគេពីបញ្ជី</li>
-                  <li>ចុះវត្តមានរួចរាល់! ✅</li>
-                </ol>
-                <p style="margin-top: 15px; font-size: 14px; color: #666;">
-                  ក្រុមហ៊ុន ឬស្ថាប័នចាប់ផ្តើមនៅម៉ោង ${lateConfig.schoolStartHour}:${lateConfig.schoolStartMinute.toString().padStart(2, '0')} ព្រឹក
-                </p>
-              </div>
-              
-              <button class="button" onclick="window.print()">
-                🖨️ បោះពុម្ព QR
-              </button>
-              
-              <div class="footer">
-                QR តែមួយ • បុគ្គលិកទាំងអស់ • ចុះវត្តមានភ្លាមៗ
-              </div>
-            </div>
-            <script>
-              // Auto-print dialog
-              window.onload = function() {
-                setTimeout(() => {
-                  if (confirm('បោះពុម្ព QR ឥឡូវនេះទេ?')) {
-                    window.print();
+                win.document.documentElement.innerHTML = `
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <title>School Attendance QR Code</title>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <style>
+                  * {
+                    margin: 0;
+                    padding: 0;
+                    box-sizing: border-box;
                   }
-                }, 500);
-              };
-            </script>
-          </body>
-        </html>
-      `;
-            win.document.close();
+                  body { 
+                    text-align: center; 
+                    padding: 20px; 
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    background: #f0f9ff;
+                    min-height: 100vh;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                  }
+                  .container {
+                    max-width: 500px;
+                    margin: 0 auto;
+                    background: white;
+                    padding: 40px 20px;
+                    border-radius: 30px;
+                    box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+                  }
+                  h1 { 
+                    color: #4F46E5; 
+                    font-size: 32px;
+                    margin-bottom: 10px;
+                  }
+                  h2 { 
+                    color: #1f2937; 
+                    font-size: 24px;
+                    margin-bottom: 20px;
+                    font-weight: normal;
+                  }
+                  .qr-code {
+                    background: white;
+                    padding: 20px;
+                    border-radius: 20px;
+                    border: 4px solid #4F46E5;
+                    margin: 30px 0;
+                    display: inline-block;
+                  }
+                  .qr-code img {
+                    width: 250px;
+                    height: 250px;
+                    display: block;
+                  }
+                  .instructions {
+                    text-align: left;
+                    background: #f3f4f6;
+                    padding: 25px;
+                    border-radius: 15px;
+                    margin: 30px 0;
+                  }
+                  .instructions h3 {
+                    color: #4F46E5;
+                    margin-bottom: 15px;
+                    font-size: 20px;
+                  }
+                  .instructions ol {
+                    margin-left: 20px;
+                    line-height: 2;
+                    color: #4b5563;
+                  }
+                  .instructions li {
+                    margin-bottom: 10px;
+                  }
+                  .button {
+                    background: #4F46E5;
+                    color: white;
+                    border: none;
+                    padding: 15px 40px;
+                    font-size: 18px;
+                    font-weight: 600;
+                    border-radius: 50px;
+                    cursor: pointer;
+                    margin: 20px 0;
+                    transition: transform 0.2s;
+                  }
+                  .button:hover {
+                    transform: scale(1.05);
+                  }
+                  .footer {
+                    color: #9ca3af;
+                    font-size: 14px;
+                    margin-top: 30px;
+                  }
+                  @media print {
+                    .button { display: none; }
+                    body { background: white; padding: 0; }
+                    .container { box-shadow: none; padding: 20px; }
+                  }
+                </style>
+              </head>
+              <body>
+                <div class="container">
+                  <h1>🏫 ចុះវត្តមានក្រុមហ៊ុន ឬស្ថាប័ន</h1>
+                  <h2>QR មួយសម្រាប់បុគ្គលិកទាំងអស់</h2>
+                  
+                  <div class="qr-code">
+                    <img src="${url}" alt="School QR Code" />
+                  </div>
+                  
+                  <div style="font-size: 28px; font-weight: bold; color: #4F46E5; margin: 20px 0;">
+                    ស្កេនដើម្បីចុះវត្តមាន
+                  </div>
+                  
+                  <div class="instructions">
+                    <h3>📋 របៀបប្រើប្រាស់:</h3>
+                    <ol>
+                      <li>ដាក់ QR code នេះនៅច្រកចូលក្រុមហ៊ុន ឬស្ថាប័ន</li>
+                      <li>បុគ្គលិកស្កេនជាមួយកាមេរ៉ាទូរស័ព្ទ</li>
+                      <li>ជ្រើសរើសឈ្មោះរបស់ពួកគេពីបញ្ជី</li>
+                      <li>ចុះវត្តមានរួចរាល់! ✅</li>
+                    </ol>
+                    <p style="margin-top: 15px; font-size: 14px; color: #666;">
+                      ក្រុមហ៊ុន ឬស្ថាប័នចាប់ផ្តើមនៅម៉ោង ${lateConfig.schoolStartHour}:${lateConfig.schoolStartMinute.toString().padStart(2, '0')} ព្រឹក
+                    </p>
+                  </div>
+                  
+                  <button class="button" onclick="window.print()">
+                    🖨️ បោះពុម្ព QR
+                  </button>
+                  
+                  <div class="footer">
+                    QR តែមួយ • បុគ្គលិកទាំងអស់ • ចុះវត្តមានភ្លាមៗ
+                  </div>
+                </div>
+                <script>
+                  // Auto-print dialog
+                  window.onload = function() {
+                    setTimeout(() => {
+                      if (confirm('បោះពុម្ព QR ឥឡូវនេះទេ?')) {
+                        window.print();
+                      }
+                    }, 500);
+                  };
+                </script>
+              </body>
+            </html>
+          `;
+                win.document.close();
+            });
+        }).catch(err => {
+            console.error('QR Generator failed to load:', err);
+            alert(translations.qrError);
         });
     };
 
     const exportToCSV = () => {
         try {
-            const headers = ['កាលបរិច្ឆេទ', 'បុគ្គលិក', 'លេខសម្គាល់', 'ម៉ោងចុះវត្តមាន', 'ស្ថានភាព', 'នាទីយឺត'];
+            const headers = ['កាលបរិច្ឆេទ', 'បុគ្គលិក', 'លេខសម្គាល់', 'ម៉ោងចុះវត្តមាន', 'ស្ថានភាព', 'រយៈពេលយឺត'];
             const rows = attendance.map(a => [
                 a.date,
                 a.employee_name,
                 a.employee_id,
                 new Date(a.check_in).toLocaleTimeString('km-KH'),
                 a.status === 'on-time' ? 'ទាន់ពេល' : a.status === 'late' ? 'យឺត' : 'យឺតខ្លាំង',
-                a.late_minutes || 0
+                a.late_minutes ? (a.late_minutes > 60 ? Math.floor(a.late_minutes / 60) + 'ម៉ោង' + (a.late_minutes % 60) + 'នាទី' : a.late_minutes + 'នាទី') : '-'
             ]);
 
             const csv = [
@@ -914,14 +829,14 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
                                 </div>
                             )}
 
-                            <button
+                            {/* <button
                                 onClick={() => setShowTelegramConfig(true)}
                                 className="flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
                                 title={translations.telegram}
                             >
                                 <Send className="h-4 w-4 mr-2" />
                                 {translations.telegram}
-                            </button>
+                            </button> */}
 
                             <button
                                 onClick={sendDailySummary}
@@ -1428,30 +1343,17 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
                         <h2 className="text-2xl font-bold mb-6">{translations.telegramSettings}</h2>
 
                         <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                                <span className="text-gray-700">{translations.enableTelegram}</span>
-                                <label className="relative inline-flex items-center cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={telegramConfig.enabled}
-                                        onChange={(e) => setTelegramConfig({ ...telegramConfig, enabled: e.target.checked })}
-                                        className="sr-only peer"
-                                    />
-                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                                </label>
+                            <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+                                Telegram settings are now managed from `.env` on the server.
                             </div>
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
                                     {translations.botToken}
                                 </label>
-                                <input
-                                    type="text"
-                                    value={telegramConfig.botToken}
-                                    onChange={(e) => setTelegramConfig({ ...telegramConfig, botToken: e.target.value })}
-                                    className="w-full border rounded-lg px-4 py-2 text-gray-800"
-                                    placeholder={translations.botTokenPlaceholder}
-                                />
+                                <div className="w-full border rounded-lg px-4 py-2 text-gray-500 bg-gray-50">
+                                    Server-managed in `TELEGRAM_BOT_TOKEN`
+                                </div>
                                 <p className="text-xs text-gray-500 mt-1">
                                     {translations.botTokenHelp}
                                 </p>
@@ -1461,13 +1363,9 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
                                     {translations.chatId}
                                 </label>
-                                <input
-                                    type="text"
-                                    value={telegramConfig.chatId}
-                                    onChange={(e) => setTelegramConfig({ ...telegramConfig, chatId: e.target.value })}
-                                    className="w-full border rounded-lg px-4 py-2 text-gray-800"
-                                    placeholder={translations.chatIdPlaceholder}
-                                />
+                                <div className="w-full border rounded-lg px-4 py-2 text-gray-500 bg-gray-50">
+                                    Server-managed in `TELEGRAM_CHAT_ID`
+                                </div>
                                 <p className="text-xs text-gray-500 mt-1">
                                     {translations.chatIdHelp}
                                 </p>
@@ -1475,34 +1373,8 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
 
                             <div className="border-t pt-4">
                                 <h3 className="font-medium mb-3">{translations.notifyWhen}</h3>
-                                <div className="space-y-2">
-                                    <label className="flex items-center space-x-2">
-                                        <input
-                                            type="checkbox"
-                                            checked={telegramConfig.notifyOnTime}
-                                            onChange={(e) => setTelegramConfig({ ...telegramConfig, notifyOnTime: e.target.checked })}
-                                            className="rounded text-blue-600"
-                                        />
-                                        <span className="text-sm text-gray-700">{translations.notifyOnTime}</span>
-                                    </label>
-                                    <label className="flex items-center space-x-2">
-                                        <input
-                                            type="checkbox"
-                                            checked={telegramConfig.notifyLate}
-                                            onChange={(e) => setTelegramConfig({ ...telegramConfig, notifyLate: e.target.checked })}
-                                            className="rounded text-blue-600"
-                                        />
-                                        <span className="text-sm text-gray-700">{translations.notifyLate}</span>
-                                    </label>
-                                    <label className="flex items-center space-x-2">
-                                        <input
-                                            type="checkbox"
-                                            checked={telegramConfig.notifyVeryLate}
-                                            onChange={(e) => setTelegramConfig({ ...telegramConfig, notifyVeryLate: e.target.checked })}
-                                            className="rounded text-blue-600"
-                                        />
-                                        <span className="text-sm text-gray-700">{translations.notifyVeryLate}</span>
-                                    </label>
+                                <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+                                    Use `TELEGRAM_ENABLED`, `TELEGRAM_NOTIFY_ON_TIME`, `TELEGRAM_NOTIFY_LATE`, and `TELEGRAM_NOTIFY_VERY_LATE` in `.env`.
                                 </div>
                             </div>
 
@@ -1516,11 +1388,10 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
                                 <button
                                     onClick={() => {
                                         setShowTelegramConfig(false);
-                                        localStorage.setItem('telegramConfig', JSON.stringify(telegramConfig));
                                     }}
                                     className="flex-1 bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 transition-colors"
                                 >
-                                    {translations.saveSettings}
+                                    {translations.close}
                                 </button>
                             </div>
                         </div>

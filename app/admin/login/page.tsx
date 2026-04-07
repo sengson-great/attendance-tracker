@@ -187,7 +187,7 @@ export default function AdminLogin() {
                   onChange={(e) => handlePinChange(index, e.target.value)}
                   onKeyDown={(e) => handleKeyDown(index, e)}
                   disabled={loading || isLocked}
-                  className="w-14 h-14 text-center text-2xl font-bold border-2 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 disabled:bg-gray-100"
+                  className="w-14 h-14 text-center text-2xl text-black font-bold border-2 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 disabled:bg-gray-100"
                   autoFocus={index === 0}
                 />
               ))}

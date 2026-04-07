@@ -2,13 +2,12 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { createClient } from '@supabase/supabase-js';
 import {
   Camera, CheckCircle, XCircle, Search,
-  Users, ArrowLeft, Clock, MapPin, Loader,
-  AlertCircle, RefreshCw, CameraOff, Navigation
+  Users, Clock, MapPin, Loader,
+  AlertCircle, CameraOff, Navigation
 } from 'lucide-react';
-import { recordAttendanceAction } from '../actions';
+import { recordAttendanceAction, getPublicEmployeesAction, getPublicSchoolSettingsAction } from '../actions';
 
 // Types
 interface Employee {
@@ -17,13 +16,6 @@ interface Employee {
   full_name: string;
   department: string;
   emoji: string;
-}
-
-interface SchoolLocation {
-  latitude: number;
-  longitude: number;
-  allowed_radius: number;
-  school_name: string;
 }
 
 // Khmer translations
@@ -79,17 +71,6 @@ const translations = {
   fromSchool: 'ពីក្រុមហ៊ុន ឬស្ថាប័ន'
 };
 
-// Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  {
-    auth: {
-      persistSession: false
-    }
-  }
-);
-
 const formatMinutes = (totalMinutes: number): string => {
   if (!totalMinutes) return `0 ${translations.minutes}`;
   if (totalMinutes < 60) return `${totalMinutes} ${translations.minutes}`;
@@ -125,34 +106,6 @@ export default function ScanPage() {
   const streamRef = useRef<MediaStream | null>(null);
   const scanIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Late configuration
-  const LATE_CONFIG = {
-    schoolStartHour: 7,
-    schoolStartMinute: 0,
-    gracePeriod: 5
-  };
-
-  // Load school settings
-  useEffect(() => {
-    const loadSchoolSettings = async () => {
-      const { data } = await supabase
-        .from('school_settings')
-        .select('latitude, longitude, allowed_radius')
-        .eq('id', 1)
-        .single();
-
-      if (data) {
-        setSchoolLocation({
-          lat: data.latitude,
-          lng: data.longitude,
-          radius: data.allowed_radius
-        });
-      }
-    };
-
-    loadSchoolSettings();
-  }, []);
-
   useEffect(() => {
     loadEmployees();
     loadSchoolLocation();
@@ -183,15 +136,12 @@ export default function ScanPage() {
 
   const loadSchoolLocation = async () => {
     try {
-      const { data, error } = await supabase
-        .from('school_settings')
-        .select('*')
-        .eq('id', 1)
-        .single();
-
-      if (error) throw error;
-      setSchoolLocation(data);
-      console.log('School location loaded:', data);
+      const data = await getPublicSchoolSettingsAction();
+      setSchoolLocation({
+        lat: data.latitude,
+        lng: data.longitude,
+        radius: data.allowed_radius
+      });
     } catch (err) {
       console.error('Error loading school location:', err);
     }
@@ -199,13 +149,7 @@ export default function ScanPage() {
 
   const loadEmployees = async () => {
     try {
-      const { data, error } = await supabase
-        .from('employees')
-        .select('*')
-        .eq('active', true)
-        .order('full_name');
-
-      if (error) throw error;
+      const data = await getPublicEmployeesAction();
       setEmployees(data || []);
       setFilteredEmployees(data || []);
     } catch (err) {
@@ -226,7 +170,7 @@ export default function ScanPage() {
       Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-    return Math.round(R * c); // distance in meters, rounded
+    return Math.round(R * c);
   };
 
   const getUserLocation = (): Promise<{ lat: number, lng: number }> => {
@@ -259,7 +203,6 @@ export default function ScanPage() {
 
   const verifyLocation = async (): Promise<boolean> => {
     if (!schoolLocation) {
-      console.error('School location not loaded');
       setLocationError('School location not configured');
       return false;
     }
@@ -278,9 +221,6 @@ export default function ScanPage() {
       );
       setDistance(dist);
 
-      console.log(`📍 Distance from school: ${dist} meters`);
-      console.log(`📍 Allowed radius: ${schoolLocation.radius} meters`);
-
       if (dist <= schoolLocation.radius) {
         setLocationVerified(true);
         setIsVerifyingLocation(false);
@@ -292,9 +232,7 @@ export default function ScanPage() {
         return false;
       }
     } catch (error) {
-      console.error('Location error:', error);
       setIsVerifyingLocation(false);
-
       if (error instanceof GeolocationPositionError) {
         switch (error.code) {
           case error.PERMISSION_DENIED:
@@ -315,52 +253,6 @@ export default function ScanPage() {
       return false;
     }
   };
-
-  const calculateLateStatus = (checkInTime: string): { status: 'on-time' | 'late' | 'very-late', minutes: number } => {
-    const checkIn = new Date(checkInTime);
-    const startTime = new Date(checkIn);
-    startTime.setHours(LATE_CONFIG.schoolStartHour, LATE_CONFIG.schoolStartMinute, 0);
-
-    const diffMinutes = Math.floor((checkIn.getTime() - startTime.getTime()) / (1000 * 60));
-
-    if (diffMinutes <= LATE_CONFIG.gracePeriod) {
-      return { status: 'on-time', minutes: 0 };
-    } else if (diffMinutes <= 30) {
-      return { status: 'late', minutes: diffMinutes };
-    } else {
-      return { status: 'very-late', minutes: diffMinutes };
-    }
-  };
-
-const sendTelegramNotification = async (attendanceRecord: any, status: string, minutes: number) => {
-    try {
-        console.log('📤 Sending Telegram notification for:', attendanceRecord.employee_name);
-
-        const response = await fetch('/api/send-telegram', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                employeeName: attendanceRecord.employee_name,
-                employeeId: attendanceRecord.employee_id,
-                checkInTime: attendanceRecord.check_in,
-                status: status,
-                lateMinutes: minutes,
-                distance: attendanceRecord.distance_from_school
-            })
-        });
-
-        const data = await response.json();
-        console.log('📥 Telegram response:', data);
-        
-        if (!response.ok) {
-            console.error('❌ Telegram error:', data.error);
-        } else {
-            console.log('✅ Telegram notification sent successfully');
-        }
-    } catch (error) {
-        console.error('❌ Failed to send Telegram notification:', error);
-    }
-};
 
   const stopCamera = useCallback(() => {
     if (scanIntervalRef.current) {
@@ -399,7 +291,6 @@ const sendTelegramNotification = async (attendanceRecord: any, status: string, m
 
       streamRef.current = stream;
       setCameraPermission(true);
-      setDebug(translations.cameraReady);
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -408,17 +299,13 @@ const sendTelegramNotification = async (attendanceRecord: any, status: string, m
         videoRef.current.onloadedmetadata = () => {
           videoRef.current?.play();
           setCameraInitialized(true);
-          setDebug('');
           startQRScanning();
         };
       }
     } catch (err) {
       console.error('Camera error:', err);
       setCameraPermission(false);
-
       if (err instanceof Error) {
-        setDebug(`${translations.cameraError}: ${err.message}`);
-
         if (err.name === 'NotAllowedError') {
           setError(translations.cameraAccessDenied);
         } else if (err.name === 'NotFoundError') {
@@ -444,7 +331,6 @@ const sendTelegramNotification = async (attendanceRecord: any, status: string, m
         if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth > 0) {
           canvas.width = video.videoWidth;
           canvas.height = video.videoHeight;
-
           context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
           try {
@@ -457,32 +343,26 @@ const sendTelegramNotification = async (attendanceRecord: any, status: string, m
               handleQRCode(code.data);
             }
           } catch (e) {
-            // Ignore image data errors
+            // Ignore
           }
         }
       }, 300);
     }).catch(err => {
       console.error('Failed to load QR scanner:', err);
-      setDebug(`QR scanner error: ${err.message}`);
       setError(translations.checkInFailed);
     });
   };
 
   const handleQRCode = async (data: string) => {
-    // Stop scanning
     if (scanIntervalRef.current) {
       clearInterval(scanIntervalRef.current);
       scanIntervalRef.current = null;
     }
-
     stopCamera();
 
-    console.log('QR Code scanned:', data);
-
-    // Check if it's our QR code
-    const validQR = data === 'SCHOOL_ATTENDANCE' ||
-      data.includes('school-attendance') ||
-      data.includes('SCHOOL_ATTENDANCE');
+    const validQR = data === 'SCHOOL_ATTENDANCE' || 
+                    data.includes('school-attendance') || 
+                    data.includes('SCHOOL_ATTENDANCE');
 
     if (validQR) {
       setStep('employees');
@@ -498,7 +378,6 @@ const sendTelegramNotification = async (attendanceRecord: any, status: string, m
     setSelectedEmployee(employee);
 
     try {
-      // Verify location first
       const isAtSchool = await verifyLocation();
       if (!isAtSchool) {
         setLoading(false);
@@ -521,13 +400,8 @@ const sendTelegramNotification = async (attendanceRecord: any, status: string, m
         return;
       }
 
-      // Send Telegram notification
-      await sendTelegramNotification(result.attendance, result.status, result.minutes);
-
       setStep('success');
-
       if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-
     } catch (err) {
       console.error('Check-in error:', err);
       setError(translations.checkInFailed);
@@ -540,7 +414,6 @@ const sendTelegramNotification = async (attendanceRecord: any, status: string, m
   const startScanning = () => {
     setStep('scan');
     setError(null);
-    setDebug('');
     startCamera();
   };
 
@@ -550,7 +423,6 @@ const sendTelegramNotification = async (attendanceRecord: any, status: string, m
     setSearchTerm('');
     setSelectedEmployee(null);
     setError(null);
-    setDebug('');
     setCameraPermission(null);
     setCameraInitialized(false);
     setLocationVerified(false);
@@ -563,24 +435,9 @@ const sendTelegramNotification = async (attendanceRecord: any, status: string, m
     startScanning();
   };
 
-  // Get status text in Khmer
-  const getStatusText = (status: string, minutes?: number) => {
-    switch (status) {
-      case 'on-time':
-        return translations.onTime;
-      case 'late':
-        return minutes ? `${translations.late} (${formatMinutes(minutes)})` : translations.late;
-      case 'very-late':
-        return minutes ? `${translations.veryLate} (${formatMinutes(minutes)})` : translations.veryLate;
-      default:
-        return '';
-    }
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="container mx-auto px-4 py-8">
-        {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent leading-relaxed py-3">
             {translations.appTitle}
@@ -588,14 +445,12 @@ const sendTelegramNotification = async (attendanceRecord: any, status: string, m
           <p className="text-gray-600 mt-2">{translations.appSubtitle}</p>
         </div>
 
-        {/* Main Card */}
         <div className="max-w-md mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="bg-white rounded-3xl shadow-2xl overflow-hidden"
           >
-            {/* Status Bar */}
             <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
               <div className="flex items-center justify-between text-white">
                 <span className="font-medium">
@@ -615,7 +470,6 @@ const sendTelegramNotification = async (attendanceRecord: any, status: string, m
               </div>
             </div>
 
-            {/* Content */}
             <div className="p-6">
               <AnimatePresence mode="wait">
                 {step === 'welcome' && (
@@ -631,14 +485,12 @@ const sendTelegramNotification = async (attendanceRecord: any, status: string, m
                     </div>
                     <h2 className="text-2xl font-bold mb-4">{translations.welcome}</h2>
                     <p className="text-gray-600 mb-8">{translations.scanInstruction}</p>
-
                     <button
                       onClick={startScanning}
                       className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-4 rounded-xl text-lg font-semibold hover:shadow-lg transform hover:scale-105 transition-all"
                     >
                       {translations.startCamera}
                     </button>
-
                     {error && (
                       <div className="mt-4 p-3 bg-red-100 text-red-600 rounded-lg flex items-center">
                         <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
@@ -656,7 +508,6 @@ const sendTelegramNotification = async (attendanceRecord: any, status: string, m
                     exit={{ opacity: 0 }}
                     className="text-center"
                   >
-                    {/* Camera view */}
                     <div className="relative bg-black rounded-xl overflow-hidden aspect-video">
                       {!cameraInitialized && cameraPermission !== false && (
                         <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
@@ -689,26 +540,15 @@ const sendTelegramNotification = async (attendanceRecord: any, status: string, m
                         muted
                         className="w-full h-full object-cover"
                       />
-
                       <canvas ref={canvasRef} className="hidden" />
-
-                      {/* Scan overlay */}
                       <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
                         <div className="w-48 h-48 border-2 border-white rounded-2xl opacity-50"></div>
                       </div>
-
-                      {/* Scanning animation */}
                       {cameraInitialized && (
                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent animate-scan"></div>
                       )}
                     </div>
-
-                    {debug && (
-                      <p className="text-xs text-gray-400 mt-2">{debug}</p>
-                    )}
-
                     <p className="text-sm text-gray-500 mt-4">{translations.pointCamera}</p>
-
                     <button
                       onClick={resetToWelcome}
                       className="mt-4 px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
@@ -725,7 +565,6 @@ const sendTelegramNotification = async (attendanceRecord: any, status: string, m
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
                   >
-                    {/* Location verification status */}
                     {isVerifyingLocation && (
                       <div className="mb-4 p-4 bg-blue-50 rounded-lg">
                         <div className="flex items-center space-x-2 text-blue-600">
@@ -758,7 +597,6 @@ const sendTelegramNotification = async (attendanceRecord: any, status: string, m
                       </div>
                     )}
 
-                    {/* Search */}
                     <div className="relative mb-4">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-900" />
                       <input
@@ -771,20 +609,11 @@ const sendTelegramNotification = async (attendanceRecord: any, status: string, m
                       />
                     </div>
 
-                    {/* Employee count */}
-                    <div className="flex items-center justify-between mb-3">
-                      <p className="text-sm text-gray-500">
-                        {filteredEmployees.length} {translations.employeesFound}
-                      </p>
-                      <button
-                        onClick={resetToWelcome}
-                        className="text-sm text-blue-600 hover:text-blue-700"
-                      >
-                        ← {translations.back}
-                      </button>
+                    <div className="flex items-center justify-between mb-3 text-sm text-gray-500">
+                      <p>{filteredEmployees.length} {translations.employeesFound}</p>
+                      <button onClick={resetToWelcome} className="text-blue-600">← {translations.back}</button>
                     </div>
 
-                    {/* Employee list */}
                     <div className="max-h-96 overflow-y-auto space-y-2 pr-1">
                       {filteredEmployees.length === 0 ? (
                         <div className="text-center py-8 text-gray-500">
@@ -798,8 +627,7 @@ const sendTelegramNotification = async (attendanceRecord: any, status: string, m
                             animate={{ opacity: 1, x: 0 }}
                             onClick={() => handleEmployeeSelect(employee)}
                             disabled={loading}
-                            className={`w-full text-left p-4 border-2 rounded-xl transition-all flex items-center space-x-3
-                            `}
+                            className="w-full text-left p-4 border-2 rounded-xl transition-all flex items-center space-x-3"
                           >
                             <span className="text-3xl">{employee.emoji || '👩‍🏫'}</span>
                             <div className="flex-1">
@@ -824,15 +652,10 @@ const sendTelegramNotification = async (attendanceRecord: any, status: string, m
                     <div className="bg-green-100 rounded-full w-32 h-32 flex items-center justify-center mx-auto mb-6">
                       <CheckCircle className="w-16 h-16 text-green-600" />
                     </div>
-
-                    <h2 className="text-3xl font-bold text-green-600 mb-2">
-                      {translations.welcome_back}
-                    </h2>
-
+                    <h2 className="text-3xl font-bold text-green-600 mb-2">{translations.welcome_back}</h2>
                     <div className="text-5xl mb-2">{selectedEmployee.emoji}</div>
                     <p className="text-2xl font-semibold mb-1 text-black">{selectedEmployee.full_name}</p>
                     <p className="text-gray-500 mb-4">{selectedEmployee.department}</p>
-
                     <div className="bg-blue-50 rounded-xl p-4 mt-4">
                       <div className="flex items-center justify-center space-x-2 text-blue-600 mb-2">
                         <Clock className="h-4 w-4" />
@@ -842,13 +665,7 @@ const sendTelegramNotification = async (attendanceRecord: any, status: string, m
                         <MapPin className="h-4 w-4" />
                         <span className="font-medium">{translations.schoolEntrance}</span>
                       </div>
-                      {distance && (
-                        <div className="text-sm text-blue-500 mt-2">
-                          {distance} {translations.meters} {translations.fromSchool}
-                        </div>
-                      )}
                     </div>
-
                     <button
                       onClick={resetToWelcome}
                       className="mt-6 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-8 py-3 rounded-xl font-semibold hover:shadow-lg transform hover:scale-105 transition-all"
@@ -868,35 +685,17 @@ const sendTelegramNotification = async (attendanceRecord: any, status: string, m
                     <div className="bg-red-100 rounded-full w-32 h-32 flex items-center justify-center mx-auto mb-6">
                       <XCircle className="w-16 h-16 text-red-600" />
                     </div>
-
-                    <h2 className="text-2xl font-bold text-red-600 mb-4">
-                      {translations.checkInFailed}
-                    </h2>
-
-                    <p className="text-gray-600 mb-6">
-                      {locationError || error || translations.checkInFailed}
-                    </p>
-
+                    <h2 className="text-2xl font-bold text-red-600 mb-4">{translations.checkInFailed}</h2>
+                    <p className="text-gray-600 mb-6">{locationError || error || translations.checkInFailed}</p>
                     <div className="flex space-x-3">
-                      <button
-                        onClick={retryScan}
-                        className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700"
-                      >
-                        {translations.tryAgain}
-                      </button>
-                      <button
-                        onClick={resetToWelcome}
-                        className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-xl font-semibold hover:bg-gray-300"
-                      >
-                        {translations.cancel}
-                      </button>
+                      <button onClick={retryScan} className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-semibold">{translations.tryAgain}</button>
+                      <button onClick={resetToWelcome} className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-xl font-semibold">{translations.cancel}</button>
                     </div>
                   </motion.div>
                 )}
               </AnimatePresence>
             </div>
 
-            {/* Footer */}
             <div className="bg-gray-50 px-6 py-3 border-t text-center text-sm text-gray-500">
               {step === 'welcome' && '📍 QR តែមួយ • បុគ្គលិកទាំងអស់ • GPS ផ្ទៀងផ្ទាត់'}
               {step === 'scan' && `🎯 ${translations.centerQR}`}
@@ -904,8 +703,7 @@ const sendTelegramNotification = async (attendanceRecord: any, status: string, m
               {step === 'success' && `✨ ${translations.haveNiceDay}`}
             </div>
           </motion.div>
-
-          {/* Live Attendance Preview */}
+          
           {step === 'welcome' && (
             <motion.div
               initial={{ opacity: 0 }}
@@ -916,7 +714,9 @@ const sendTelegramNotification = async (attendanceRecord: any, status: string, m
                 <Users className="h-4 w-4 mr-2 text-blue-600" />
                 {translations.todayCheckins}
               </h3>
-              <LiveAttendancePreview />
+              <div className="text-center text-gray-400 text-sm py-4">
+                រង់ចាំបុគ្គលិកចុះវត្តមាន...
+              </div>
             </motion.div>
           )}
         </div>
@@ -931,86 +731,6 @@ const sendTelegramNotification = async (attendanceRecord: any, status: string, m
           animation: scan 2s linear infinite;
         }
       `}</style>
-    </div>
-  );
-}
-
-// Live attendance preview component
-function LiveAttendancePreview() {
-  const [recent, setRecent] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const loadRecent = async () => {
-      try {
-        const today = new Date().toISOString().split('T')[0];
-        const { data } = await supabase
-          .from('attendance')
-          .select('employee_name, check_in')
-          .eq('date', today)
-          .order('check_in', { ascending: false })
-          .limit(5);
-
-        setRecent(data || []);
-      } catch (error) {
-        console.error('Error loading recent attendance:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadRecent();
-
-    const subscription = supabase
-      .channel('attendance-preview')
-      .on('postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'attendance' },
-        (payload) => {
-          setRecent(prev => [payload.new, ...prev].slice(0, 5));
-        }
-      )
-      .subscribe();
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="flex justify-center py-4">
-        <Loader className="h-5 w-5 animate-spin text-blue-600" />
-      </div>
-    );
-  }
-
-  if (recent.length === 0) {
-    return (
-      <p className="text-center text-gray-400 py-4 text-sm">
-        មិនទាន់មានការចុះវត្តមាននៅឡើយទេ
-      </p>
-    );
-  }
-
-  return (
-    <div className="space-y-2">
-      {recent.map((item, i) => (
-        <motion.div
-          key={i}
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: i * 0.1 }}
-          className="flex items-center justify-between text-sm p-2 hover:bg-gray-50 rounded-lg"
-        >
-          <span className="font-medium text-black">{item.employee_name}</span>
-          <span className="text-gray-400">
-            {new Date(item.check_in).toLocaleTimeString('km-KH', {
-              hour: '2-digit',
-              minute: '2-digit'
-            })}
-          </span>
-        </motion.div>
-      ))}
     </div>
   );
 }
