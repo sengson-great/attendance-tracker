@@ -207,8 +207,8 @@ const LATE_CONFIG = {
 
 // Supabase client
 const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    process.env.SUPABASE_URL!,
+    process.env.SUPABASE_ANON_KEY!
 );
 
 // Color type for stat cards
@@ -242,7 +242,7 @@ const toKhmerNum = (num: number | string) => {
 const formatKhmerDateLong = (dateString: string | Date) => {
     const days = ['អាទិត្យ', 'ចន្ទ', 'អង្គារ', 'ពុធ', 'ព្រហស្បតិ៍', 'សុក្រ', 'សៅរ៍'];
     const months = ['មករា', 'កុម្ភៈ', 'មីនា', 'មេសា', 'ឧសភា', 'មិថុនា', 'កក្កដា', 'សីហា', 'កញ្ញា', 'តុលា', 'វិច្ឆិកា', 'ធ្នូ'];
-    
+
     const d = new Date(dateString);
     const dayName = days[d.getDay()];
     const date = toKhmerNum(d.getDate());
@@ -349,10 +349,10 @@ export default function AdminPage() {
         setLoading(true);
         try {
             const data = await fetchAdminDataAction(selectedDate);
-            
+
             const employeesData = data.employees;
             const attendanceData = data.attendance;
-            
+
             if (data.settings) {
                 setLateConfig({
                     schoolStartHour: data.settings.school_start_hour,
@@ -518,7 +518,7 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
     };
 
     const generateTelegramLink = (employee: Employee) => {
-        const botUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || 'YourBot';
+        const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'YourBot';
         const link = `https://t.me/${botUsername}?start=${employee.id}`;
 
         navigator.clipboard.writeText(link);
@@ -1421,7 +1421,7 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
 
                         <div className="bg-gray-100 p-3 rounded-lg mb-4">
                             <code className="text-sm break-all">
-                                https://t.me/{process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || 'YourBot'}?start={selectedEmployeeForTelegram.id}
+                                https://t.me/{process.env.TELEGRAM_BOT_USERNAME || 'YourBot'}?start={selectedEmployeeForTelegram.id}
                             </code>
                         </div>
 

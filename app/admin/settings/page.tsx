@@ -121,8 +121,8 @@ const translations = {
 
 // Supabase client
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_ANON_KEY!
 );
 
 // Types
@@ -145,7 +145,7 @@ export default function SettingsPage() {
   const [pinInput, setPinInput] = useState(['', '', '', '']);
   const [pinError, setPinError] = useState<string | null>(null);
   const [showPin, setShowPin] = useState(false);
-  
+
   // Settings states
   const [settings, setSettings] = useState<SchoolSettings>({
     id: 1,
@@ -179,7 +179,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     loadSettings();
-    
+
     // Check if already authenticated in this session
     const sessionAuth = sessionStorage.getItem('settings_auth');
     if (sessionAuth === 'true') {
@@ -490,11 +490,10 @@ export default function SettingsPage() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`flex-1 flex items-center justify-center space-x-2 px-4 py-2 rounded-lg transition-all ${
-                  activeTab === tab.id
+                className={`flex-1 flex items-center justify-center space-x-2 px-4 py-2 rounded-lg transition-all ${activeTab === tab.id
                     ? 'bg-indigo-600 text-white shadow-md'
                     : 'text-gray-600 hover:bg-gray-100'
-                }`}
+                  }`}
               >
                 <tab.icon className="h-4 w-4" />
                 <span className="font-medium">{tab.label}</span>
@@ -507,9 +506,8 @@ export default function SettingsPage() {
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className={`mb-6 p-4 rounded-lg flex items-center ${
-                message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
-              }`}
+              className={`mb-6 p-4 rounded-lg flex items-center ${message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+                }`}
             >
               {message.type === 'success' ? (
                 <CheckCircle className="h-5 w-5 mr-2 flex-shrink-0" />
@@ -611,14 +609,14 @@ export default function SettingsPage() {
                 </button>
               </div>
 
-                       <h3 className="font-semibold text-blue-800 my-3">{translations.helpTitle}</h3>
-          <div className="space-y-2 text-sm text-blue-700">
-            <p>{translations.helpStep1}</p>
-            <p>{translations.helpStep2}</p>
-            <p>{translations.helpStep3}</p>
-            <p>{translations.helpStep4}</p>
-            <p className="mt-3 text-xs text-blue-600">{translations.helpNote}</p>
-          </div>
+              <h3 className="font-semibold text-blue-800 my-3">{translations.helpTitle}</h3>
+              <div className="space-y-2 text-sm text-blue-700">
+                <p>{translations.helpStep1}</p>
+                <p>{translations.helpStep2}</p>
+                <p>{translations.helpStep3}</p>
+                <p>{translations.helpStep4}</p>
+                <p className="mt-3 text-xs text-blue-600">{translations.helpNote}</p>
+              </div>
             </motion.div>
           )}
 
