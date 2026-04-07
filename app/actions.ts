@@ -8,7 +8,7 @@ import { processCheckinNotification } from "@/lib/telegram";
 // Create a high-privilege Supabase client using the Service Role Key
 // This allows the server to bypass RLS for necessary writes.
 function getAdminSupabase() {
-  const supabaseUrl = process.env.SUPABASE_URL!;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
     console.error(
@@ -18,7 +18,8 @@ function getAdminSupabase() {
   }
 
   const supabaseKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY!;
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
   return createClient(supabaseUrl, supabaseKey);
 }
 
