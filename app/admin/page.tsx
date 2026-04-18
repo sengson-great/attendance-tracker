@@ -11,6 +11,7 @@ import {
     Send, MessageSquare, Bell, MapPin, LogOut
 } from 'lucide-react';
 import Link from 'next/link';
+import * as XLSX from 'xlsx';
 
 // Khmer translations
 const translations = {
@@ -31,7 +32,7 @@ const translations = {
     settings: 'ការកំណត់',
     lateSettings: 'កំណត់ការយឺត',
     printQR: 'បោះពុម្ព QR',
-    exportCSV: 'ទាញយក CSV',
+    exportExcel: 'ទាញយក Excel',
     addEmployee: 'បន្ថែមបុគ្គលិក',
 
     // Status indicators
@@ -747,7 +748,7 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
         });
     };
 
-    const exportToCSV = () => {
+    const exportToExcel = () => {
         try {
             const headers = ['កាលបរិច្ឆេទ', 'បុគ្គលិក', 'លេខសម្គាល់', 'ម៉ោងចុះវត្តមាន', 'ស្ថានភាព', 'រយៈពេលយឺត'];
             const rows = attendance.map(a => [
@@ -759,20 +760,13 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
                 a.late_minutes ? (a.late_minutes > 60 ? Math.floor(a.late_minutes / 60) + 'ម៉ោង' + (a.late_minutes % 60) + 'នាទី' : a.late_minutes + 'នាទី') : '-'
             ]);
 
-            const csv = [
-                headers.join(','),
-                ...rows.map(row => row.join(','))
-            ].join('\n');
+            const data = [headers, ...rows];
+            const worksheet = XLSX.utils.aoa_to_sheet(data);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Attendance');
 
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `attendance-${selectedDate}.csv`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
+            // Generate buffer and save
+            XLSX.writeFile(workbook, `attendance-${selectedDate}.xlsx`);
         } catch (error) {
             alert(translations.exportError);
         }
@@ -865,11 +859,11 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
                             </button>
 
                             <button
-                                onClick={exportToCSV}
+                                onClick={exportToExcel}
                                 className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                             >
                                 <Download className="h-4 w-4 mr-2" />
-                                {translations.exportCSV}
+                                {translations.exportExcel}
                             </button>
 
                             <button

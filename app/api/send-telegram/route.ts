@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { verifySession } from '@/lib/auth';
-import { sendTelegramMessage } from '@/lib/telegram';
+import { processCheckinNotification, sendTelegramMessage } from '@/lib/telegram';
 
 export async function POST(request: Request) {
   try {
@@ -28,6 +28,9 @@ export async function POST(request: Request) {
 ✨ <b>ស្ថានភាព:</b> ដំណើរការល្អ!
       `.trim();
       const result = await sendTelegramMessage(message);
+      return NextResponse.json(result);
+    } else if (body.type === "checkin") {
+      const result = await processCheckinNotification(body);
       return NextResponse.json(result);
     } else {
       const { chatId, message } = body;

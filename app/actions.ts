@@ -127,7 +127,7 @@ export async function fetchAdminDataAction(selectedDate?: string) {
       .from("employees")
       .select("*")
       .eq("active", true)
-      .order("full_name"),
+      .order("created_at", { ascending: false }),
     attendanceQuery,
     supabase
       .from("school_settings")
