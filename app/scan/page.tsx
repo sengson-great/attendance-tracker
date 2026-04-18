@@ -67,6 +67,17 @@ const translations = {
   locationNotReady: 'ប្រព័ន្ធកំពុងរៀបចំទីតាំងសាលា។ សូមរង់ចាំបន្តិច ហើយព្យាយាមម្តងទៀត។',
   locationTimeout: 'សូមព្យាយាមម្តងទៀត',
   locationRequiresHttps: 'ទូរស័ព្ទរបស់អ្នកអាចប្រើទីតាំងបានតែនៅលើ HTTPS ឬ localhost ប៉ុណ្ណោះ។',
+  allowLocation: 'អនុញ្ញាតទីតាំង',
+  locationReadyToCheckIn: 'ទីតាំងរួចរាល់ សូមជ្រើសឈ្មោះដើម្បីចុះវត្តមាន',
+  locationPermissionHelp: 'សូមចុចប៊ូតុងនេះមុន ជាពិសេសនៅលើ Safari ដើម្បីអនុញ្ញាតទីតាំង។',
+  safariHelpTitle: 'មានបញ្ហាទីតាំងលើ Safari?',
+  safariHelpBody: 'បើស្កេនពីកាមេរ៉ា iPhone ហើយ Safari មិនអនុញ្ញាតទីតាំង សូមធ្វើតាមជំហានខាងក្រោម។',
+  safariStep1: 'ទៅកាន់ Settings > Privacy & Security > Location Services > Safari Websites',
+  safariStep2: 'ជ្រើស While Using the App',
+  safariStep3: 'បើក Precise Location',
+  safariStep4: 'ត្រឡប់មកទំព័រនេះ ហើយចុចឈ្មោះម្តងទៀត',
+  safariTelegramHint: 'បើ Safari នៅតែមិនអនុញ្ញាត អ្នកអាចបើកតំណនេះក្នុង Telegram browser បាន។',
+  hideHelp: 'បិទការណែនាំ',
   notAtSchool: 'អ្នកនៅឆ្ងាយពីក្រុមហ៊ុន ឬស្ថាប័ន {{distance}} ម៉ែត្រ។ សូមមកក្រុមហ៊ុន ឬស្ថាប័នដើម្បីចុះវត្តមាន។',
   distance: 'ចម្ងាយ',
   meters: 'ម៉ែត្រ',
@@ -102,12 +113,21 @@ export default function ScanPage() {
   const [distance, setDistance] = useState<number | null>(null);
   const [isVerifyingLocation, setIsVerifyingLocation] = useState(false);
   const [schoolLocation, setSchoolLocation] = useState<{ lat: number, lng: number, radius: number } | null>(null);
+  const [showSafariHelp, setShowSafariHelp] = useState(false);
 
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const scanIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const detectIPhoneSafari = () => {
+    if (typeof navigator === 'undefined') return false;
+    const ua = navigator.userAgent;
+    return /iPhone|iPad|iPod/i.test(ua) &&
+      /Safari/i.test(ua) &&
+      !/CriOS|FxiOS|EdgiOS|OPiOS|Instagram|FBAN|FBAV|Line|Telegram/i.test(ua);
+  };
 
   useEffect(() => {
     loadEmployees();
@@ -219,6 +239,7 @@ export default function ScanPage() {
     setIsVerifyingLocation(true);
     setLocationVerified(false);
     setLocationError(null);
+    setShowSafariHelp(false);
 
     try {
       const resolvedSchoolLocation = schoolLocation ?? await loadSchoolLocation();
@@ -249,6 +270,7 @@ export default function ScanPage() {
         switch (error.code) {
           case error.PERMISSION_DENIED:
             setLocationError(translations.locationDenied);
+            setShowSafariHelp(detectIPhoneSafari());
             break;
           case error.POSITION_UNAVAILABLE:
             setLocationError(translations.locationUnavailable);
@@ -451,6 +473,10 @@ export default function ScanPage() {
     startScanning();
   };
 
+  const requestLocationPermission = async () => {
+    await verifyLocation();
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="container mx-auto px-4 py-8">
@@ -610,6 +636,7 @@ export default function ScanPage() {
                             {distance} {translations.meters} {translations.fromSchool}
                           </span>
                         </div>
+                        <p className="mt-2 text-sm text-green-700">{translations.locationReadyToCheckIn}</p>
                       </div>
                     )}
 
@@ -618,6 +645,50 @@ export default function ScanPage() {
                         <div className="flex items-center space-x-2 text-red-600">
                           <AlertCircle className="h-5 w-5" />
                           <span>{locationError}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {showSafariHelp && (
+                      <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
+                        <div className="flex items-start space-x-2">
+                          <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0" />
+                          <div className="flex-1">
+                            <p className="font-semibold">{translations.safariHelpTitle}</p>
+                            <p className="mt-1 text-sm">{translations.safariHelpBody}</p>
+                            <div className="mt-3 space-y-1 text-sm">
+                              <p>1. {translations.safariStep1}</p>
+                              <p>2. {translations.safariStep2}</p>
+                              <p>3. {translations.safariStep3}</p>
+                              <p>4. {translations.safariStep4}</p>
+                            </div>
+                            <p className="mt-3 text-sm">{translations.safariTelegramHint}</p>
+                            <button
+                              type="button"
+                              onClick={() => setShowSafariHelp(false)}
+                              className="mt-3 rounded-lg bg-amber-100 px-3 py-2 text-sm font-medium text-amber-900 hover:bg-amber-200"
+                            >
+                              {translations.hideHelp}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {!locationVerified && (
+                      <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-medium text-blue-900">{translations.locationPermissionHelp}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={requestLocationPermission}
+                            disabled={isVerifyingLocation || !schoolLocation}
+                            className="shrink-0 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+                          >
+                            {isVerifyingLocation ? translations.verifyingLocation : translations.allowLocation}
+                          </button>
                         </div>
                       </div>
                     )}
