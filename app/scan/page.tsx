@@ -64,7 +64,9 @@ const translations = {
   locationVerified: 'ទីតាំងត្រឹមត្រូវ',
   locationDenied: 'សូមអនុញ្ញាតិឱ្យប្រើទីតាំងដើម្បីចុះវត្តមាន',
   locationUnavailable: 'មិនអាចកំណត់ទីតាំងបានទេ',
+  locationNotReady: 'ប្រព័ន្ធកំពុងរៀបចំទីតាំងសាលា។ សូមរង់ចាំបន្តិច ហើយព្យាយាមម្តងទៀត។',
   locationTimeout: 'សូមព្យាយាមម្តងទៀត',
+  locationRequiresHttps: 'ទូរស័ព្ទរបស់អ្នកអាចប្រើទីតាំងបានតែនៅលើ HTTPS ឬ localhost ប៉ុណ្ណោះ។',
   notAtSchool: 'អ្នកនៅឆ្ងាយពីក្រុមហ៊ុន ឬស្ថាប័ន {{distance}} ម៉ែត្រ។ សូមមកក្រុមហ៊ុន ឬស្ថាប័នដើម្បីចុះវត្តមាន។',
   distance: 'ចម្ងាយ',
   meters: 'ម៉ែត្រ',
@@ -84,6 +86,7 @@ export default function ScanPage() {
   const [step, setStep] = useState<'welcome' | 'scan' | 'employees' | 'success' | 'error'>('welcome');
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
+  const [employeesLoading, setEmployeesLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
@@ -137,17 +140,21 @@ export default function ScanPage() {
   const loadSchoolLocation = async () => {
     try {
       const data = await getPublicSchoolSettingsAction();
-      setSchoolLocation({
+      const nextSchoolLocation = {
         lat: data.latitude,
         lng: data.longitude,
         radius: data.allowed_radius
-      });
+      };
+      setSchoolLocation(nextSchoolLocation);
+      return nextSchoolLocation;
     } catch (err) {
       console.error('Error loading school location:', err);
+      return null;
     }
   };
 
   const loadEmployees = async () => {
+    setEmployeesLoading(true);
     try {
       const data = await getPublicEmployeesAction();
       setEmployees(data || []);
@@ -155,6 +162,8 @@ export default function ScanPage() {
     } catch (err) {
       console.error('Error loading employees:', err);
       setError(translations.checkInFailed);
+    } finally {
+      setEmployeesLoading(false);
     }
   };
 
@@ -175,6 +184,11 @@ export default function ScanPage() {
 
   const getUserLocation = (): Promise<{ lat: number, lng: number }> => {
     return new Promise((resolve, reject) => {
+      if (!window.isSecureContext) {
+        reject(new Error('Geolocation requires a secure context (HTTPS or localhost)'));
+        return;
+      }
+
       if (!navigator.geolocation) {
         reject(new Error('Geolocation not supported'));
         return;
@@ -201,38 +215,36 @@ export default function ScanPage() {
     });
   };
 
-  const verifyLocation = async (): Promise<boolean> => {
-    if (!schoolLocation) {
-      setLocationError('School location not configured');
-      return false;
-    }
-
+  const verifyLocation = async (): Promise<{ ok: boolean; location?: { lat: number; lng: number }; distance?: number }> => {
     setIsVerifyingLocation(true);
     setLocationVerified(false);
     setLocationError(null);
 
     try {
+      const resolvedSchoolLocation = schoolLocation ?? await loadSchoolLocation();
+      if (!resolvedSchoolLocation) {
+        setLocationError(translations.locationNotReady);
+        return { ok: false };
+      }
+
       const location = await getUserLocation();
       setUserLocation(location);
 
       const dist = calculateDistance(
         location.lat, location.lng,
-        schoolLocation.lat, schoolLocation.lng
+        resolvedSchoolLocation.lat, resolvedSchoolLocation.lng
       );
       setDistance(dist);
 
-      if (dist <= schoolLocation.radius) {
+      if (dist <= resolvedSchoolLocation.radius) {
         setLocationVerified(true);
-        setIsVerifyingLocation(false);
-        return true;
+        return { ok: true, location, distance: dist };
       } else {
         const errorMsg = translations.notAtSchool.replace('{{distance}}', dist.toString());
         setLocationError(errorMsg);
-        setIsVerifyingLocation(false);
-        return false;
+        return { ok: false, location, distance: dist };
       }
     } catch (error) {
-      setIsVerifyingLocation(false);
       if (error instanceof GeolocationPositionError) {
         switch (error.code) {
           case error.PERMISSION_DENIED:
@@ -247,10 +259,14 @@ export default function ScanPage() {
           default:
             setLocationError(translations.locationUnavailable);
         }
+      } else if (error instanceof Error && error.message.includes('secure context')) {
+        setLocationError(translations.locationRequiresHttps);
       } else {
         setLocationError(translations.locationUnavailable);
       }
-      return false;
+      return { ok: false };
+    } finally {
+      setIsVerifyingLocation(false);
     }
   };
 
@@ -378,8 +394,8 @@ export default function ScanPage() {
     setSelectedEmployee(employee);
 
     try {
-      const isAtSchool = await verifyLocation();
-      if (!isAtSchool) {
+      const verification = await verifyLocation();
+      if (!verification.ok || !verification.location) {
         setLoading(false);
         setStep('error');
         return;
@@ -388,10 +404,10 @@ export default function ScanPage() {
       const result = await recordAttendanceAction({
         employee_id: employee.id,
         location: translations.schoolEntrance,
-        location_lat: userLocation?.lat,
-        location_lng: userLocation?.lng,
+        location_lat: verification.location.lat,
+        location_lng: verification.location.lng,
         location_verified: true,
-        distance_from_school: distance,
+        distance_from_school: verification.distance,
       });
 
       if (result.alreadyCheckedIn) {
@@ -565,6 +581,15 @@ export default function ScanPage() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
                   >
+                    {employeesLoading && (
+                      <div className="mb-4 p-4 bg-blue-50 rounded-lg">
+                        <div className="flex items-center space-x-2 text-blue-600">
+                          <Loader className="h-5 w-5 animate-spin" />
+                          <span>កំពុងផ្ទុកបញ្ជីបុគ្គលិក...</span>
+                        </div>
+                      </div>
+                    )}
+
                     {isVerifyingLocation && (
                       <div className="mb-4 p-4 bg-blue-50 rounded-lg">
                         <div className="flex items-center space-x-2 text-blue-600">
@@ -606,6 +631,7 @@ export default function ScanPage() {
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-black"
                         autoFocus
+                        disabled={employeesLoading}
                       />
                     </div>
 
@@ -615,7 +641,11 @@ export default function ScanPage() {
                     </div>
 
                     <div className="max-h-96 overflow-y-auto space-y-2 pr-1">
-                      {filteredEmployees.length === 0 ? (
+                      {employeesLoading ? (
+                        <div className="text-center py-8 text-gray-500">
+                          កំពុងផ្ទុកបុគ្គលិក...
+                        </div>
+                      ) : filteredEmployees.length === 0 ? (
                         <div className="text-center py-8 text-gray-500">
                           {translations.noEmployeesFound} "{searchTerm}"
                         </div>
@@ -626,7 +656,7 @@ export default function ScanPage() {
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
                             onClick={() => handleEmployeeSelect(employee)}
-                            disabled={loading}
+                            disabled={loading || !schoolLocation}
                             className="w-full text-left p-4 border-2 rounded-xl transition-all flex items-center space-x-3"
                           >
                             <span className="text-3xl">{employee.emoji || '👩‍🏫'}</span>
