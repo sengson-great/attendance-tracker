@@ -57,7 +57,7 @@ export async function sendTelegramMessage(message: string, customChatId?: string
 }
 
 export async function processCheckinNotification(data: any) {
-  const employeeName = data.employeeName || data.teacherName || data.name;
+  const employeeName = data.employeeName || data.employee_name || data.teacherName || data.name;
   const employeeId = data.employeeId || data.employee_id || data.id;
   const checkInTime = data.checkInTime || data.check_in || new Date().toISOString();
   const status = data.status || "on-time";
@@ -100,7 +100,7 @@ ${distance ? `📍 <b>ចម្ងាយ:</b> ${distance} ម៉ែត្រ` : 
 📅 <b>កាលបរិច្ឆេទ:</b> ${dateFormatted}
   `.trim();
 
-  if (status === "late" || status === "very-late") {
+  if ((status === "late" || status === "very-late") && lateMinutes > 0) {
     message += `\n\n⚠️ <b>សូមចំណាំ:</b> បុគ្គលិកបានមកយឺត ${formatLateTime(lateMinutes)}`;
   }
 

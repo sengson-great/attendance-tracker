@@ -299,14 +299,18 @@ export async function recordAttendanceAction(attendanceData: any) {
   }
 
   // Asynchronously dispatch the telegram message securely from the backend!
+  let telegramResult = null;
   try {
-    processCheckinNotification({
+    telegramResult = await processCheckinNotification({
       ...safeData,
       lateMinutes: minutes,
-    }).catch((e) => console.error("Telegram notification error:", e));
+    });
+    require('fs').appendFileSync('telegram_debug.log', JSON.stringify({ time: new Date().toISOString(), type: 'success', telegramResult }) + '\\n');
   } catch (e) {
-    // We don't fail the checkin just because telegram failed
+    console.error("Telegram notification error:", e);
+    telegramResult = { success: false, error: String(e) };
+    require('fs').appendFileSync('telegram_debug.log', JSON.stringify({ time: new Date().toISOString(), type: 'error', telegramResult }) + '\\n');
   }
 
-  return { attendance: newAttendance, status, minutes };
+  return { attendance: newAttendance, status, minutes, telegramResult };
 }

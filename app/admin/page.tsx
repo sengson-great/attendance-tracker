@@ -8,7 +8,8 @@ import {
     Users, UserCheck, UserX, Clock, Calendar,
     Download, Plus, Search, Printer, Trash2,
     AlertTriangle, Timer, Coffee, Settings,
-    Send, MessageSquare, Bell, MapPin, LogOut
+    Send, MessageSquare, Bell, MapPin, LogOut,
+    User, Inbox
 } from 'lucide-react';
 import Link from 'next/link';
 import * as XLSX from 'xlsx';
@@ -16,7 +17,7 @@ import * as XLSX from 'xlsx';
 // Khmer translations
 const translations = {
     // Page title
-    adminTitle: 'អ្នកគ្រប់គ្រងវត្តមានក្រុមហ៊ុន ឬស្ថាប័ន',
+    adminTitle: 'អ្នកគ្រប់គ្រងវត្តមានសាលា',
 
     // Stats cards
     totalEmployees: 'បុគ្គលិកសរុប',
@@ -37,8 +38,8 @@ const translations = {
 
     // Status indicators
     sending: 'កំពុងផ្ញើ...',
-    sent: 'ផ្ញើរួច! ✅',
-    error: 'កំហុស ❌',
+    sent: 'ផ្ញើរួច!',
+    error: 'កំហុស',
     telegramActive: 'តេឡេក្រាមសកម្ម',
 
     // Late summary
@@ -701,7 +702,7 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
               </head>
               <body>
                 <div class="container">
-                  <h1>🏫 ចុះវត្តមានក្រុមហ៊ុន ឬស្ថាប័ន</h1>
+                  <h1>ចុះវត្តមានក្រុមហ៊ុន ឬស្ថាប័ន</h1>
                   <h2>QR មួយសម្រាប់បុគ្គលិកទាំងអស់</h2>
                   
                   <div class="qr-code">
@@ -713,12 +714,12 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
                   </div>
                   
                   <div class="instructions">
-                    <h3>📋 របៀបប្រើប្រាស់:</h3>
+                    <h3>របៀបប្រើប្រាស់:</h3>
                     <ol>
                       <li>ដាក់ QR code នេះនៅច្រកចូលក្រុមហ៊ុន ឬស្ថាប័ន</li>
                       <li>បុគ្គលិកស្កេនជាមួយកាមេរ៉ាទូរស័ព្ទ</li>
                       <li>ជ្រើសរើសឈ្មោះរបស់ពួកគេពីបញ្ជី</li>
-                      <li>ចុះវត្តមានរួចរាល់! ✅</li>
+                      <li>ចុះវត្តមានរួចរាល់!</li>
                     </ol>
                     <p style="margin-top: 15px; font-size: 14px; color: #666;">
                       ក្រុមហ៊ុន ឬស្ថាប័នចាប់ផ្តើមនៅម៉ោង ${lateConfig.schoolStartHour}:${lateConfig.schoolStartMinute.toString().padStart(2, '0')} ព្រឹក
@@ -726,7 +727,7 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
                   </div>
                   
                   <button class="button" onclick="window.print()">
-                    🖨️ បោះពុម្ព QR
+                    បោះពុម្ព QR
                   </button>
                   
                   <div class="footer">
@@ -786,13 +787,13 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
     const getStatusInfo = (status: string) => {
         switch (status) {
             case 'on-time':
-                return { bg: 'bg-green-100', text: 'text-green-700', icon: '✅', label: translations.onTimeLabel };
+                return { bg: 'bg-green-100', text: 'text-green-700', icon: <UserCheck className="h-3.5 w-3.5 mr-1" />, label: translations.onTimeLabel };
             case 'late':
-                return { bg: 'bg-yellow-100', text: 'text-yellow-700', icon: '⚠️', label: translations.lateLabel };
+                return { bg: 'bg-yellow-100', text: 'text-yellow-700', icon: <AlertTriangle className="h-3.5 w-3.5 mr-1" />, label: translations.lateLabel };
             case 'very-late':
-                return { bg: 'bg-red-100', text: 'text-red-700', icon: '🔴', label: translations.veryLateLabel };
+                return { bg: 'bg-red-100', text: 'text-red-700', icon: <Timer className="h-3.5 w-3.5 mr-1" />, label: translations.veryLateLabel };
             default:
-                return { bg: 'bg-gray-100', text: 'text-gray-700', icon: '❓', label: translations.unknown };
+                return { bg: 'bg-gray-100', text: 'text-gray-700', icon: null, label: translations.unknown };
         }
     };
 
@@ -948,7 +949,7 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
                             <div className="flex items-center space-x-3">
                                 <AlertTriangle className="h-5 w-5 text-yellow-600" />
                                 <span className="font-medium text-gray-700">
-                                    ⚠️ {stats.late + stats.veryLate} {translations.employeesLateToday}
+                                    {stats.late + stats.veryLate} {translations.employeesLateToday}
                                 </span>
                             </div>
                             <button
@@ -999,7 +1000,7 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
 
                     {attendance.length === 0 ? (
                         <div className="text-center py-12">
-                            <div className="text-6xl mb-4">📭</div>
+                            <Inbox className="h-16 w-16 text-gray-300 mx-auto mb-4" />
                             <p className="text-gray-500 text-lg">{translations.noCheckIns}</p>
                             <p className="text-gray-400 text-sm mt-2">{translations.scanMessage}</p>
                         </div>
@@ -1032,7 +1033,7 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
                                                 </td>
                                                 <td className="py-3 px-4">
                                                     <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusInfo.bg} ${statusInfo.text} flex items-center w-fit`}>
-                                                        <span className="mr-1">{statusInfo.icon}</span>
+                                                        {statusInfo.icon}
                                                         {statusInfo.label}
                                                     </span>
                                                 </td>
@@ -1196,19 +1197,7 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
                                 />
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    {translations.emojiLabel}
-                                </label>
-                                <select
-                                    value={newEmployee.emoji}
-                                    onChange={(e) => setNewEmployee({ ...newEmployee, emoji: e.target.value })}
-                                    className="w-full border rounded-lg px-4 py-2 text-gray-800 focus:ring-2 focus:ring-indigo-500"
-                                >
-                                    <option value="👩‍🏫">{translations.femaleEmployee}</option>
-                                    <option value="👨‍🏫">{translations.maleEmployee}</option>
-                                </select>
-                            </div>
+
 
                             <div className="flex space-x-3 pt-6">
                                 <button
@@ -1410,7 +1399,9 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
                         <h2 className="text-2xl font-bold mb-6">{translations.connectTelegramTitle}</h2>
 
                         <div className="text-center mb-6">
-                            <div className="text-6xl mb-4">{selectedEmployeeForTelegram.emoji}</div>
+                            <div className="h-16 w-16 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-500 mx-auto mb-4">
+                                <User className="h-8 w-8" />
+                            </div>
                             <h3 className="text-xl font-semibold">{selectedEmployeeForTelegram.full_name}</h3>
                             <p className="text-gray-500">{selectedEmployeeForTelegram.employee_id}</p>
                         </div>

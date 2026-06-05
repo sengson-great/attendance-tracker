@@ -5,7 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Camera, CheckCircle, XCircle, Search,
   Users, Clock, MapPin, Loader,
-  AlertCircle, CameraOff, Navigation
+  AlertCircle, CameraOff, Navigation,
+  User, Smartphone
 } from 'lucide-react';
 import { recordAttendanceAction, getPublicEmployeesAction, getPublicSchoolSettingsAction } from '../actions';
 
@@ -69,7 +70,6 @@ const translations = {
   locationRequiresHttps: 'ទូរស័ព្ទរបស់អ្នកអាចប្រើទីតាំងបានតែនៅលើ HTTPS ឬ localhost ប៉ុណ្ណោះ។',
   allowLocation: 'អនុញ្ញាតទីតាំង',
   locationReadyToCheckIn: 'ទីតាំងរួចរាល់ សូមជ្រើសឈ្មោះដើម្បីចុះវត្តមាន',
-  locationPermissionHelp: 'សូមចុចប៊ូតុងនេះមុន ជាពិសេសនៅលើ Safari ដើម្បីអនុញ្ញាតទីតាំង។',
   safariHelpTitle: 'មានបញ្ហាទីតាំងលើ Safari?',
   safariHelpBody: 'បើស្កេនពីកាមេរ៉ា iPhone ហើយ Safari មិនអនុញ្ញាតទីតាំង សូមធ្វើតាមជំហានខាងក្រោម។',
   safariStep1: 'ទៅកាន់ Settings > Privacy & Security > Location Services > Safari Websites',
@@ -495,12 +495,12 @@ export default function ScanPage() {
           >
             <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
               <div className="flex items-center justify-between text-white">
-                <span className="font-medium">
-                  {step === 'welcome' && `📱 ${translations.ready}`}
-                  {step === 'scan' && `📸 ${translations.scanning}`}
-                  {step === 'employees' && `👆 ${translations.selectYourName}`}
-                  {step === 'success' && `✅ ${translations.checkInComplete}`}
-                  {step === 'error' && `❌ ${translations.error}`}
+                <span className="font-medium flex items-center gap-1.5">
+                  {step === 'welcome' && <span className="flex items-center gap-1.5"><Smartphone className="h-4 w-4" /> {translations.ready}</span>}
+                  {step === 'scan' && <span className="flex items-center gap-1.5"><Camera className="h-4 w-4 animate-pulse" /> {translations.scanning}</span>}
+                  {step === 'employees' && <span className="flex items-center gap-1.5"><Users className="h-4 w-4" /> {translations.selectYourName}</span>}
+                  {step === 'success' && <span className="flex items-center gap-1.5"><CheckCircle className="h-4 w-4 text-green-400" /> {translations.checkInComplete}</span>}
+                  {step === 'error' && <span className="flex items-center gap-1.5"><XCircle className="h-4 w-4 text-red-400" /> {translations.error}</span>}
                 </span>
                 {step === 'scan' && cameraInitialized && (
                   <div className="flex space-x-1">
@@ -677,10 +677,7 @@ export default function ScanPage() {
 
                     {!locationVerified && (
                       <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-4">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="font-medium text-blue-900">{translations.locationPermissionHelp}</p>
-                          </div>
+                        <div className="flex justify-end">
                           <button
                             type="button"
                             onClick={requestLocationPermission}
@@ -730,7 +727,9 @@ export default function ScanPage() {
                             disabled={loading || !schoolLocation}
                             className="w-full text-left p-4 border-2 rounded-xl transition-all flex items-center space-x-3"
                           >
-                            <span className="text-3xl">{employee.emoji || '👩‍🏫'}</span>
+                            <div className="h-10 w-10 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                              <User className="h-5 w-5" />
+                            </div>
                             <div className="flex-1">
                               <div className="font-semibold text-gray-800">{employee.full_name}</div>
                               <div className="text-sm text-gray-500">{employee.department}</div>
@@ -754,7 +753,9 @@ export default function ScanPage() {
                       <CheckCircle className="w-16 h-16 text-green-600" />
                     </div>
                     <h2 className="text-3xl font-bold text-green-600 mb-2">{translations.welcome_back}</h2>
-                    <div className="text-5xl mb-2">{selectedEmployee.emoji}</div>
+                    <div className="h-16 w-16 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-500 mx-auto mb-3">
+                      <User className="h-8 w-8" />
+                    </div>
                     <p className="text-2xl font-semibold mb-1 text-black">{selectedEmployee.full_name}</p>
                     <p className="text-gray-500 mb-4">{selectedEmployee.department}</p>
                     <div className="bg-blue-50 rounded-xl p-4 mt-4">
@@ -798,10 +799,26 @@ export default function ScanPage() {
             </div>
 
             <div className="bg-gray-50 px-6 py-3 border-t text-center text-sm text-gray-500">
-              {step === 'welcome' && '📍 QR តែមួយ • បុគ្គលិកទាំងអស់ • GPS ផ្ទៀងផ្ទាត់'}
-              {step === 'scan' && `🎯 ${translations.centerQR}`}
-              {step === 'employees' && `👥 ${translations.selectYourName}`}
-              {step === 'success' && `✨ ${translations.haveNiceDay}`}
+              {step === 'welcome' && (
+                <span className="flex items-center justify-center gap-1.5">
+                  <MapPin className="h-4 w-4 text-blue-500" /> QR តែមួយ • បុគ្គលិកទាំងអស់ • GPS ផ្ទៀងផ្ទាត់
+                </span>
+              )}
+              {step === 'scan' && (
+                <span className="flex items-center justify-center gap-1.5">
+                  <Navigation className="h-4 w-4 text-indigo-500" /> {translations.centerQR}
+                </span>
+              )}
+              {step === 'employees' && (
+                <span className="flex items-center justify-center gap-1.5">
+                  <Users className="h-4 w-4 text-blue-500" /> {translations.selectYourName}
+                </span>
+              )}
+              {step === 'success' && (
+                <span className="flex items-center justify-center gap-1.5">
+                  <CheckCircle className="h-4 w-4 text-green-500" /> {translations.haveNiceDay}
+                </span>
+              )}
             </div>
           </motion.div>
           
