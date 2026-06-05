@@ -92,7 +92,6 @@ export async function processCheckinNotification(data: any) {
 <b>🏢 ចុះវត្តមានថ្មី</b>
 
 👤 <b>បុគ្គលិក:</b> ${employeeName}
-🆔 <b>លេខសម្គាល់:</b> ${employeeId}
 ⏰ <b>ម៉ោង:</b> ${timeFormatted}
 📊 <b>ស្ថានភាព:</b> ${emoji} ${khmer}
 ${lateMinutes > 0 ? `⏱️ <b>យឺត:</b> ${formatLateTime(lateMinutes)}` : ""}

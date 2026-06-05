@@ -730,7 +730,6 @@ export default function ScanPage() {
                             <div className="flex-1">
                               <div className="font-semibold text-gray-800">{employee.full_name}</div>
                               <div className="text-sm text-gray-500">{employee.department}</div>
-                              <div className="text-xs text-gray-400 mt-1">{employee.employee_id}</div>
                             </div>
                           </motion.button>
                         ))

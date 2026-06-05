@@ -536,7 +536,7 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
 
         try {
             await addEmployeeAction({
-                employee_id: newEmployee.employee_id || `TCH${Math.floor(100 + Math.random() * 900)}`,
+                employee_id: `EMP-${Math.floor(100000 + Math.random() * 900000)}`,
                 full_name: newEmployee.full_name,
                 department: newEmployee.department || 'មិនមានកំណត់',
                 emoji: newEmployee.emoji,
@@ -756,11 +756,10 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
 
     const exportToExcel = () => {
         try {
-            const headers = ['កាលបរិច្ឆេទ', 'បុគ្គលិក', 'លេខសម្គាល់', 'ម៉ោងចុះវត្តមាន', 'ស្ថានភាព', 'រយៈពេលយឺត'];
+            const headers = ['កាលបរិច្ឆេទ', 'បុគ្គលិក', 'ម៉ោងចុះវត្តមាន', 'ស្ថានភាព', 'រយៈពេលយឺត'];
             const rows = attendance.map(a => [
                 a.date,
                 a.employee_name,
-                a.employee_id,
                 new Date(a.check_in).toLocaleTimeString('km-KH'),
                 a.status === 'on-time' ? 'ទាន់ពេល' : a.status === 'late' ? 'យឺត' : 'យឺតខ្លាំង',
                 a.late_minutes ? (a.late_minutes > 60 ? Math.floor(a.late_minutes / 60) + 'ម៉ោង' + (a.late_minutes % 60) + 'នាទី' : a.late_minutes + 'នាទី') : '-'
@@ -1009,7 +1008,6 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
                                 <thead className="bg-gray-50">
                                     <tr>
                                         <th className="text-left py-3 px-4 font-semibold text-gray-600">{translations.employee}</th>
-                                        <th className="text-left py-3 px-4 font-semibold text-gray-600">{translations.employeeId}</th>
                                         <th className="text-left py-3 px-4 font-semibold text-gray-600">{translations.checkInTime}</th>
                                         <th className="text-left py-3 px-4 font-semibold text-gray-600">{translations.status}</th>
                                         <th className="text-left py-3 px-4 font-semibold text-gray-600">{translations.lateMinutes}</th>
@@ -1022,7 +1020,6 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
                                         return (
                                             <tr key={i} className="border-b hover:bg-gray-50 transition-colors">
                                                 <td className="py-3 px-4 font-medium text-black">{a.employee_name}</td>
-                                                <td className="py-3 px-4 text-gray-600">{a.employee_id}</td>
                                                 <td className="py-3 px-4 text-gray-600">
                                                     {new Date(a.check_in).toLocaleTimeString('km-KH', {
                                                         hour: '2-digit',
@@ -1108,7 +1105,6 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
                                                         </span>
                                                     )}
                                                 </div>
-                                                <p className="text-sm text-gray-500">{employee.employee_id}</p>
                                                 <p className="text-xs text-gray-400 mt-1">{employee.department}</p>
                                                 {today && (
                                                     <div className="mt-2">
@@ -1156,19 +1152,6 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
                         <h2 className="text-2xl font-bold mb-6 text-black">{translations.addNewEmployee}</h2>
 
                         <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    {translations.employeeIdLabel}
-                                </label>
-                                <input
-                                    type="text"
-                                    value={newEmployee.employee_id}
-                                    onChange={(e) => setNewEmployee({ ...newEmployee, employee_id: e.target.value })}
-                                    className="w-full border rounded-lg px-4 py-2 text-gray-800 focus:ring-2 focus:ring-indigo-500"
-                                    placeholder={translations.employeeIdPlaceholder}
-                                />
-                            </div>
-
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
                                     {translations.fullNameLabel} <span className="text-red-500">*</span>
@@ -1412,7 +1395,6 @@ ${attendanceList || 'មិនទាន់មានការចុះវត្�
                         <div className="text-center mb-6">
                             <div className="text-6xl mb-4">{selectedEmployeeForTelegram.emoji}</div>
                             <h3 className="text-xl font-semibold">{selectedEmployeeForTelegram.full_name}</h3>
-                            <p className="text-gray-500">{selectedEmployeeForTelegram.employee_id}</p>
                         </div>
 
                         <p className="text-gray-600 mb-4">
