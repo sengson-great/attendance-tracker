@@ -298,8 +298,8 @@ export async function recordAttendanceAction(attendanceData: any) {
     throw new Error(JSON.stringify(error));
   }
 
-  // Asynchronously dispatch the telegram message securely from the backend!
-  processCheckinNotification({
+  // Await the telegram message dispatch securely from the backend!
+  await processCheckinNotification({
     ...safeData,
     lateMinutes: minutes,
   }).catch((e) => console.error("Telegram notification error:", e));

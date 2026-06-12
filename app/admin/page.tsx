@@ -317,8 +317,6 @@ export default function AdminPage() {
                     console.log('New attendance record detected:', payload);
                     // Reload data to update stats
                     await loadData();
-                    // Send Telegram notification for the new check-in
-                    await sendTelegramNotification(payload.new);
                 }
             )
             .subscribe((status: any) => {
