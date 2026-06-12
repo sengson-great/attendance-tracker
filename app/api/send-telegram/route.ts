@@ -23,7 +23,7 @@ export async function POST(request: Request) {
       const message = `
 <b>✅ សាកល្បងការតភ្ជាប់ Telegram</b>
 
-🕐 <b>ម៉ោង:</b> ${new Date().toLocaleTimeString("km-KH")}
+🕐 <b>ម៉ោង:</b> ${new Date().toLocaleTimeString("km-KH", { timeZone: "Asia/Phnom_Penh" })}
 📊 <b>ប្រព័ន្ធ:</b> ប្រព័ន្ធចុះវត្តមានបុគ្គលិក
 ✨ <b>ស្ថានភាព:</b> ដំណើរការល្អ!
       `.trim();

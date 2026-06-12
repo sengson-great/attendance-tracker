@@ -212,11 +212,15 @@ export async function recordAttendanceAction(attendanceData: any) {
   let minutes = attendanceData.late_minutes;
 
   if (config) {
-    const startTime = new Date(now);
-    startTime.setHours(config.school_start_hour, config.school_start_minute, 0);
+    // Get check-in time in ICT (+7) by shifting UTC time by 7 hours
+    const ictTime = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+    
+    // Create startTime at config hour/minute in ICT on the same local day
+    const startTimeIct = new Date(ictTime);
+    startTimeIct.setUTCHours(config.school_start_hour, config.school_start_minute, 0, 0);
 
     const diffMinutes = Math.floor(
-      (now.getTime() - startTime.getTime()) / (1000 * 60),
+      (ictTime.getTime() - startTimeIct.getTime()) / (1000 * 60)
     );
 
     if (diffMinutes <= config.grace_period) {

@@ -331,10 +331,14 @@ export default function AdminPage() {
     // Calculate late status based on check-in time
     const calculateLateStatus = (checkInTime: string, config: any): { status: 'on-time' | 'late' | 'very-late', minutes: number } => {
         const checkIn = new Date(checkInTime);
-        const startTime = new Date(checkIn);
-        startTime.setHours(config.schoolStartHour, config.schoolStartMinute, 0);
+        // Get check-in time in ICT (+7) by shifting UTC time by 7 hours
+        const checkInIct = new Date(checkIn.getTime() + 7 * 60 * 60 * 1000);
+        
+        // Create startTime at config hour/minute in ICT on the same local day
+        const startTimeIct = new Date(checkInIct);
+        startTimeIct.setUTCHours(config.schoolStartHour, config.schoolStartMinute, 0, 0);
 
-        const diffMinutes = Math.floor((checkIn.getTime() - startTime.getTime()) / (1000 * 60));
+        const diffMinutes = Math.floor((checkInIct.getTime() - startTimeIct.getTime()) / (1000 * 60));
 
         if (diffMinutes <= config.gracePeriod) {
             return { status: 'on-time', minutes: 0 };

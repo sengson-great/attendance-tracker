@@ -81,11 +81,13 @@ export async function processCheckinNotification(data: any) {
   const { emoji, khmer } = statusMap[status] || { emoji: "📌", khmer: status };
 
   const timeFormatted = new Date(checkInTime).toLocaleTimeString("km-KH", {
-    hour: '2-digit', minute: '2-digit', second: '2-digit'
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    timeZone: 'Asia/Phnom_Penh'
   });
   
-  const dateFormatted = new Date().toLocaleDateString("km-KH", {
-    year: 'numeric', month: 'long', day: 'numeric'
+  const dateFormatted = new Date(checkInTime).toLocaleDateString("km-KH", {
+    year: 'numeric', month: 'long', day: 'numeric',
+    timeZone: 'Asia/Phnom_Penh'
   });
 
   let message = `
