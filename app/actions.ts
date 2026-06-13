@@ -214,13 +214,18 @@ export async function recordAttendanceAction(attendanceData: any) {
   if (config) {
     // Get check-in time in ICT (+7) by shifting UTC time by 7 hours
     const ictTime = new Date(now.getTime() + 7 * 60 * 60 * 1000);
-    
+
     // Create startTime at config hour/minute in ICT on the same local day
     const startTimeIct = new Date(ictTime);
-    startTimeIct.setUTCHours(config.school_start_hour, config.school_start_minute, 0, 0);
+    startTimeIct.setUTCHours(
+      config.school_start_hour,
+      config.school_start_minute,
+      0,
+      0,
+    );
 
     const diffMinutes = Math.floor(
-      (ictTime.getTime() - startTimeIct.getTime()) / (1000 * 60)
+      (ictTime.getTime() - startTimeIct.getTime()) / (1000 * 60),
     );
 
     if (diffMinutes <= config.grace_period) {
@@ -282,7 +287,7 @@ export async function recordAttendanceAction(attendanceData: any) {
     employee_name: employee.full_name,
     check_in: now.toISOString(),
     date: today,
-    location: attendanceData.location || "ច្រកចូលក្រុមហ៊ុន ឬស្ថាប័ន",
+    location: attendanceData.location || "ច្រកចូលសាលារៀន",
     location_lat: attendanceData.location_lat,
     location_lng: attendanceData.location_lng,
     location_verified: isVerified,

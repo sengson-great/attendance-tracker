@@ -13,7 +13,7 @@ const translations = {
   adminDashboard: 'ទំព័រអ្នកគ្រប់គ្រង',
 
   // QR section
-  schoolEntranceQR: 'QR ច្រកចូលក្រុមហ៊ុន ឬស្ថាប័ន',
+  schoolEntranceQR: 'QR ច្រកចូលសាលារៀន',
   oneCodeForAll: 'កូដតែមួយសម្រាប់បុគ្គលិកទាំងអស់',
   printQR: 'បោះពុម្ព QR',
 
@@ -22,7 +22,7 @@ const translations = {
     {
       step: '១',
       title: 'បោះពុម្ព QR',
-      desc: 'បោះពុម្ព QR កូដតែមួយ ហើយដាក់នៅច្រកចូលក្រុមហ៊ុន ឬស្ថាប័ន',
+      desc: 'បោះពុម្ព QR កូដតែមួយ ហើយដាក់នៅច្រកចូលសាលារៀន',
       icon: '🖨️'
     },
     {
@@ -44,7 +44,7 @@ const translations = {
     { label: 'បុគ្គលិកសកម្ម', value: '៥០+' },
     { label: 'វត្តមានថ្ងៃនេះ', value: '៤២' },
     { label: 'មធ្យមពេលវេលា', value: '៣ វិនាទី' },
-    { label: 'ក្រុមហ៊ុន ឬស្ថាប័នដែលប្រើ', value: '១០០+' }
+    { label: 'សាលារៀនដែលប្រើ', value: '១០០+' }
   ]
 };
 

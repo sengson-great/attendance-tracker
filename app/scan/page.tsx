@@ -21,8 +21,8 @@ interface Employee {
 // Khmer translations
 const translations = {
   appTitle: 'ប្រព័ន្ធចុះវត្តមានបុគ្គលិក',
-  appSubtitle: 'ស្កេន QR នៅច្រកចូលក្រុមហ៊ុន ឬស្ថាប័ន',
-  welcome: 'សូមស្វាគមន៍មកកាន់ក្រុមហ៊ុន ឬស្ថាប័ន',
+  appSubtitle: 'ស្កេន QR នៅច្រកចូលសាលារៀន',
+  welcome: 'សូមស្វាគមន៍មកកាន់សាលារៀន',
   scanInstruction: 'ចុចប៊ូតុងខាងក្រោមដើម្បីស្កេន QR នៅច្រកចូល',
   startCamera: 'ចាប់ផ្តើមថត',
   scanning: 'កំពុងស្កេន...',
@@ -40,11 +40,11 @@ const translations = {
   department: 'ដេប៉ាតឺម៉ង់',
   checkInTime: 'ម៉ោងចុះវត្តមាន',
   location: 'ទីតាំង',
-  schoolEntrance: 'ច្រកចូលក្រុមហ៊ុន ឬស្ថាប័ន',
+  schoolEntrance: 'ច្រកចូលសាលារៀន',
   checkInAnother: 'ចុះវត្តមានបុគ្គលិកផ្សេងទៀត',
   cameraAccessDenied: 'មិនអាចចូលប្រើកាមេរ៉ាបានទេ។ សូមអនុញ្ញាតិឱ្យប្រើកាមេរ៉ា។',
   noCamera: 'រកមិនឃើញកាមេរ៉ានៅលើឧបករណ៍នេះទេ។',
-  invalidQR: 'QR មិនត្រឹមត្រូវ។ សូមស្កេន QR របស់ក្រុមហ៊ុន ឬស្ថាប័ន។',
+  invalidQR: 'QR មិនត្រឹមត្រូវ។ សូមស្កេន QR របស់សាលារៀន។',
   checkInFailed: 'ការចុះវត្តមានបរាជ័យ។ សូមព្យាយាមម្តងទៀត។',
   todayCheckins: 'វត្តមានថ្ងៃនេះ',
   pointCamera: 'ចង្អុលកាមេរ៉ាទៅកាន់ QR នៅច្រកចូល',
@@ -77,10 +77,10 @@ const translations = {
   safariStep4: 'ត្រឡប់មកទំព័រនេះ ហើយចុចឈ្មោះម្តងទៀត',
   safariTelegramHint: 'បើ Safari នៅតែមិនអនុញ្ញាត អ្នកអាចបើកតំណនេះក្នុង Telegram browser បាន។',
   hideHelp: 'បិទការណែនាំ',
-  notAtSchool: 'អ្នកនៅឆ្ងាយពីក្រុមហ៊ុន ឬស្ថាប័ន {{distance}} ម៉ែត្រ។ សូមមកក្រុមហ៊ុន ឬស្ថាប័នដើម្បីចុះវត្តមាន។',
+  notAtSchool: 'អ្នកនៅឆ្ងាយពីសាលារៀន {{distance}} ម៉ែត្រ។ សូមមកសាលារៀនដើម្បីចុះវត្តមាន។',
   distance: 'ចម្ងាយ',
   meters: 'ម៉ែត្រ',
-  fromSchool: 'ពីក្រុមហ៊ុន ឬស្ថាប័ន'
+  fromSchool: 'ពីសាលារៀន'
 };
 
 const formatMinutes = (totalMinutes: number): string => {
@@ -397,9 +397,9 @@ export default function ScanPage() {
     }
     stopCamera();
 
-    const validQR = data === 'SCHOOL_ATTENDANCE' || 
-                    data.includes('school-attendance') || 
-                    data.includes('SCHOOL_ATTENDANCE');
+    const validQR = data === 'SCHOOL_ATTENDANCE' ||
+      data.includes('school-attendance') ||
+      data.includes('SCHOOL_ATTENDANCE');
 
     if (validQR) {
       setStep('employees');
@@ -799,7 +799,7 @@ export default function ScanPage() {
               {step === 'success' && `✨ ${translations.haveNiceDay}`}
             </div>
           </motion.div>
-          
+
           {step === 'welcome' && (
             <motion.div
               initial={{ opacity: 0 }}
