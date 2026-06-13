@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Lock, Shield, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Lock, Shield, Eye, EyeOff, AlertCircle, Phone, X, Copy, Check } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -21,7 +21,15 @@ const translations = {
   attemptsRemaining: 'នៅសល់ {{attempts}} ដង',
   loading: 'កំពុងផ្ទុក...',
   serverError: 'មានបញ្ហាក្នុងការតភ្ជាប់។ សូមព្យាយាមម្តងទៀត។',
-  retry: 'សូមព្យាយាមម្តងទៀត'
+  retry: 'សូមព្យាយាមម្តងទៀត',
+  forgotPin: 'ភ្លេចលេខកូដ PIN?',
+  contactDevTitle: 'ទាក់ទងអ្នកអភិវឌ្ឍន៍ (Developer)',
+  contactDevDesc: 'សូមទាក់ទងអ្នកអភិវឌ្ឍន៍ដើម្បីទទួលបាន ឬបង្កើតលេខកូដ PIN ថ្មីឡើងវិញ។',
+  phoneNumber: '០៩៦ ៨០៥ ៣៩៩៧',
+  copyNumber: 'ចម្លងលេខទូរស័ព្ទ',
+  copiedNumber: 'បានចម្លង!',
+  callDev: 'ទូរស័ព្ទទៅកាន់អ្នកអភិវឌ្ឍន៍',
+  close: 'បិទ'
 };
 
 const MAX_ATTEMPTS = 5;
@@ -36,6 +44,14 @@ export default function AdminLogin() {
   const [attempts, setAttempts] = useState(0);
   const [isLocked, setIsLocked] = useState(false);
   const [lockTimer, setLockTimer] = useState<number | null>(null);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyPhone = () => {
+    navigator.clipboard.writeText('0968053997');
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   useEffect(() => {
     // Load attempts from storage
@@ -194,11 +210,12 @@ export default function AdminLogin() {
             </div>
           </div>
 
-          {/* Show/Hide PIN Toggle */}
-          <div className="flex justify-center">
+          {/* Show/Hide PIN Toggle & Forgot PIN */}
+          <div className="flex justify-between items-center text-sm px-1">
             <button
               onClick={() => setShowPin(!showPin)}
-              className="text-sm text-indigo-600 hover:text-indigo-700 flex items-center space-x-1"
+              type="button"
+              className="text-indigo-600 hover:text-indigo-700 flex items-center space-x-1 transition-colors cursor-pointer"
             >
               {showPin ? (
                 <>
@@ -211,6 +228,13 @@ export default function AdminLogin() {
                   <span>{translations.showPin}</span>
                 </>
               )}
+            </button>
+            <button
+              onClick={() => setShowForgotPassword(true)}
+              type="button"
+              className="text-gray-500 hover:text-indigo-600 transition-colors cursor-pointer"
+            >
+              {translations.forgotPin}
             </button>
           </div>
 
@@ -270,6 +294,105 @@ export default function AdminLogin() {
           </div>
         </div>
       </motion.div>
+
+      {/* Forgot Password Modal */}
+      <AnimatePresence>
+        {showForgotPassword && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowForgotPassword(false)}
+              className="absolute inset-0 bg-gray-950/60 backdrop-blur-xs"
+            />
+            
+            {/* Modal Content */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ type: 'spring', duration: 0.4 }}
+              className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 relative z-10 overflow-hidden border border-gray-100"
+            >
+              {/* Decorative top pattern */}
+              <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-500 to-indigo-600" />
+              
+              {/* Close Button */}
+              <button
+                onClick={() => setShowForgotPassword(false)}
+                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors rounded-full p-1 hover:bg-gray-100 cursor-pointer animate-none"
+              >
+                <X className="h-5 w-5" />
+              </button>
+
+              <div className="text-center mt-3">
+                {/* Icon */}
+                <div className="bg-indigo-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 border border-indigo-100">
+                  <Phone className="h-8 w-8 text-indigo-600" />
+                </div>
+                
+                {/* Title */}
+                <h3 className="text-xl font-bold text-gray-800 mb-2">
+                  {translations.contactDevTitle}
+                </h3>
+                
+                {/* Description */}
+                <p className="text-sm text-gray-500 mb-6 leading-relaxed">
+                  {translations.contactDevDesc}
+                </p>
+
+                {/* Phone Number Display Box */}
+                <div className="bg-indigo-50/50 border border-indigo-100/80 rounded-xl p-4 mb-6 flex items-center justify-between">
+                  <div className="flex flex-col text-left">
+                    <span className="text-[10px] text-indigo-500 font-semibold uppercase tracking-wider">
+                      លេខទូរស័ព្ទអ្នកអភិវឌ្ឍន៍
+                    </span>
+                    <a
+                      href="tel:0968053997"
+                      className="text-xl font-extrabold text-indigo-950 tracking-wide hover:text-indigo-700 transition-colors animate-none"
+                    >
+                      {translations.phoneNumber}
+                    </a>
+                  </div>
+                  
+                  {/* Copy Button */}
+                  <button
+                    onClick={handleCopyPhone}
+                    className="p-2 bg-white hover:bg-indigo-100 border border-gray-200 hover:border-indigo-200 text-gray-600 hover:text-indigo-700 rounded-lg shadow-xs transition-all cursor-pointer"
+                    title={translations.copyNumber}
+                  >
+                    {copied ? (
+                      <Check className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+
+                {/* Buttons */}
+                <div className="space-y-2">
+                  <a
+                    href="tel:0968053997"
+                    className="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 px-4 rounded-xl font-semibold hover:shadow-lg hover:brightness-105 active:scale-98 transition-all cursor-pointer"
+                  >
+                    <Phone className="h-4 w-4" />
+                    <span>{translations.callDev}</span>
+                  </a>
+                  
+                  <button
+                    onClick={() => setShowForgotPassword(false)}
+                    className="w-full bg-gray-50 hover:bg-gray-100 text-gray-700 py-3 px-4 rounded-xl font-semibold border border-gray-200 transition-colors cursor-pointer"
+                  >
+                    {translations.close}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
